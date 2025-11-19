@@ -1,0 +1,2 @@
+NREL-PySAM==7.1.0
+numpy==2.2.6
