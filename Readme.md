@@ -1,18 +1,3 @@
----
-
-# 📘 **Project Setup Guide (Python 3.12.2 + Virtual Environment + MATLAB Engine)**
-
-This guide will help you set up the full environment required to run this project:
-
-- Install Python **3.12.2** (if not already installed)
-- Create and activate a **virtual environment**
-- Install **MATLAB Engine for Python** inside that environment
-- Install project dependencies from `requirements.txt`
-
-This tutorial is written for **beginners**, so anyone can follow it step-by-step.
-
----
-
 # 🚀 1. Install Python 3.12.2 (Required)
 
 The project requires **Python 3.12.2**, because MATLAB Engine is only compatible with Python versions **3.9–3.12**.
