@@ -1,12 +1,12 @@
-from simulation.simulation import run_simulation
+# from simulation.simulation import run_simulation
 from optimisation.optimiser import run_optimisation
 
 
 def main():
     
     # simulation
-    sim_output = run_simulation()
-    print(f'Annual Energy : {sim_output["annual_energy"]}')
+    # sim_output = run_simulation()
+    # print(f'Annual Energy : {sim_output["annual_energy"]}')
     
     # optimisation
     x_opt, f_val = run_optimisation()

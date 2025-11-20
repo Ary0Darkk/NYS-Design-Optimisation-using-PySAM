@@ -32,4 +32,4 @@ def run_optimisation():
 
     eng.quit()
     
-    return x_opt,fval
+    return x_opt,-fval

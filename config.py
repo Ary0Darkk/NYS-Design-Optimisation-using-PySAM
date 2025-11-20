@@ -8,11 +8,11 @@ import os
 
 CONFIG = {
     # Initial guess
-    "x0": [0.0, 0.0],
+    "x0": [75, 200],
 
     # Bounds
-    "lb": [-2.0, -2.0],
-    "ub": [2.0, 2.0],
+    "lb": [50, 150],
+    "ub": [100, 250],
 
     # Function names INSIDE the MATLAB file
     "objective_name": "obj_function",
@@ -37,15 +37,15 @@ CONFIG = {
     "overrides": {
         "T_startup": 75,
         "T_shutdown": 250,
-        "I_bn_des": 800,
+        # "I_bn_des": 800,
 
-        # Tracking error values (example 1D array)
-        "TrackingError": [
-            0.70,
-            0.988,
-            0.988,
-            0.988
-        ],
+        # # Tracking error values (example 1D array)
+        # "TrackingError": [
+        #     0.70,
+        #     0.988,
+        #     0.988,
+        #     0.988
+        # ],
 
         # Example of 2D array override (commented out)
         # "D_2": [
