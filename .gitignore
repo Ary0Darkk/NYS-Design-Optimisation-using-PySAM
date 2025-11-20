@@ -1,1 +1,4 @@
-desenv
+optim_env
+__pycache__
+simulation/__pycache__
+optimisation/__pycache__
