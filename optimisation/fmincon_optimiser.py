@@ -3,12 +3,15 @@ import matlab.engine
 from config import CONFIG
 
 
-def run_optimisation():
+def run_fmincon_optimisation():
     # Start MATLAB
     eng = matlab.engine.start_matlab()
     
     # Add path where your .m file is stored
     eng.addpath(CONFIG["matlab_folder"], nargout=0)
+    
+    # print
+    print('Running fmincon optimiser...')
 
     # fmincon options
     options = eng.optimoptions("fmincon",

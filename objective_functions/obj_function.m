@@ -1,23 +1,22 @@
 function y = obj_function(x)
-% OBJECTIVE_PYSAM  Calls Python to compute annual energy using PySAM
-% and returns NEGATIVE energy (because fmincon MINIMIZES).
 
-% Import config.py
+% Load config.py
 cfg = py.config.CONFIG;
 
-% Build Python overrides dict
-% Example: x(1) = T_startup, x(2) = T_shutdown
+% Python list of variable names
+var_names = cfg{"overrides"};
+
+% Create empty Python dict
 overrides = py.dict();
-overrides{'T_startup'}  = x(1);
-overrides{'T_shutdown'} = x(2);
 
-% Call Python function run_trough(json_file, overrides)
-annual_energy = py.simulation.simulation.run_simulation(cfg{'json_file'}, overrides);
+% Loop through each variable name in config
+for i = 1:length(var_names)
+    key = char(var_names{i});   % MATLAB → Python string
+    overrides{key} = x(i);      % assign x(i) to that key
+end
 
-% Convert Python float → MATLAB double
-annual_energy = double(annual_energy);
+% Call Python simulation
+annual_energy = py.simulation.simulation.run_simulation(overrides);
 
-
-% fmincon minimizes → return negative of energy
-y = -annual_energy;
+y = -double(annual_energy); % negate for maximization
 end

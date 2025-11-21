@@ -7,16 +7,15 @@ from config import CONFIG
 
 
 
-def run_simulation(json_file,overrides):
+def run_simulation(overrides):
     
     # Convert MATLAB py arguments to Python
-    json_file = str(json_file)
     overrides = dict(overrides)
     
     tp = TP.default(CONFIG["model"])
     
     # Load JSON
-    with open(json_file, "r") as f:
+    with open(CONFIG["json_file"], "r") as f:
         data = json.load(f)
     for k, v in data.items():
         if k != "number_inputs":
@@ -29,12 +28,12 @@ def run_simulation(json_file,overrides):
     # overrides = CONFIG["overrides"]
     if overrides:
         for k, v in overrides.items():
-            print(f'Value before : {tp.value(k)}')
+            # print(f'Value before : {tp.value(k)}')
             tp.value(k, v)
-            print(f'Value after : {tp.value(k)}')
-    print('Simulation started...')
+            # print(f'Value after : {tp.value(k)}')
+    # print('Simulation started...')
     tp.execute()
-    print('Simulation finished!')
+    # print('Simulation finished!')
     
     
     return float(tp.Outputs.annual_energy)   # dict of all outputs

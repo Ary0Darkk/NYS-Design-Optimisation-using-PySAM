@@ -1,25 +1,37 @@
-% constraints
-function [c,ceq] = constraints(x)
-% CONSTRAINTS_PYSAM – nonlinear constraints for optimization.
-% You can customize constraints from config.py as well.
+function [c, ceq] = constraints(x)
+% DYNAMIC NONLINEAR CONSTRAINTS FOR MATLAB OPTIMIZATION
+% Reads variable names, lower bounds, upper bounds from config.py dynamically.
 
 % Load config.py
 cfg = py.config.CONFIG;
 
-% Example constraint from config (optional)
-% max T_startup and T_shutdown allowed
-max_T_startup  = double(cfg{'lb'}{1});
-max_T_shutdown = double(cfg{'ub'}{2});
+% Python lists
+var_names = cfg{"overrides"};
+lb_list   = cfg{"lb"};
+ub_list   = cfg{"ub"};
 
-% Example inequality constraints:
-% c(x) <= 0
+n = length(var_names);
 
-c = [
-    x(1) - max_T_startup;    % T_startup <= max allowed
-    x(2) - max_T_shutdown;   % T_shutdown <= max allowed
-    -(x(1));                 % T_startup >= 0
-    -(x(2));                 % T_shutdown >= 0
-    ];
+% Initialize constraint vector
+c = zeros(2*n, 1);   % two constraints per variable
+idx = 1;
+
+% Build constraints dynamically
+for i = 1:n
+    lb_i = double(lb_list{i});   % lower bound of variable i
+    ub_i = double(ub_list{i});   % upper bound of variable i
+
+    xi = x(i);
+
+    % Inequality constraints:
+    % 1) x(i) >= lb(i)   →   lb(i) - x(i) <= 0
+    % 2) x(i) <= ub(i)   →   x(i) - ub(i) <= 0
+
+    c(idx)   = lb_i - xi;   % lower bound constraint
+    c(idx+1) = xi - ub_i;   % upper bound constraint
+
+    idx = idx + 2;
+end
 
 % No equality constraints
 ceq = [];
