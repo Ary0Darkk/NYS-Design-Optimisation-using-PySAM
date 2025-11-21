@@ -20,8 +20,17 @@ def run_ga_optimisation():
     constraints = eng.eval(f"@{CONFIG['constraint_name']}", nargout=1)
 
     # GA options with logging
-    options = eng.gaoptimset("Display", "iter", nargout=1)
-
+    options = eng.gaoptimset("Display", "iter",
+                             "EliteCount",CONFIG["elite_count"],
+                             "HybridFcn",CONFIG["hybrid_fcn"],
+                             "MaxGenerations",CONFIG["max_generations"],
+                             "PopulationSize",CONFIG["pop_size"],
+                             "UseParallel",CONFIG["use_parallel"], 
+                             nargout=1)
+    
+    
+    # FIXME : constraints and options get incorrectly parsed,
+    # num of arg issue
     # ----- CORRECT GA CALL -----
     x, fval = eng.ga(
         fitness,

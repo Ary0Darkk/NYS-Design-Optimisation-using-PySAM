@@ -16,7 +16,10 @@ def run_fmincon_optimisation():
     # fmincon options
     options = eng.optimoptions("fmincon",
                             "Display", CONFIG["display"],
-                            "Algorithm", CONFIG["algorithm"])
+                            "Algorithm", CONFIG["algorithm"],
+                            "MaxFunctionEvaluations",CONFIG["max_function_evaluation"],
+                            "MaxIterations",CONFIG["max_iterations"],
+                            "ConstraintTolerance",CONFIG["constraint_tolerance"])
 
     # Run fmincon using your external MATLAB functions
     x_opt, fval = eng.fmincon(
