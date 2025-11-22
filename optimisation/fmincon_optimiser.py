@@ -5,7 +5,7 @@ from config import CONFIG
 
 def run_fmincon_optimisation():
     # Start MATLAB
-    eng = matlab.engine.start_matlab()
+    eng = matlab.engine.start_matlab("-nojvm -nodesktop -nosplash")
     
     # Add path where your .m file is stored
     eng.addpath(CONFIG["matlab_folder"], nargout=0)

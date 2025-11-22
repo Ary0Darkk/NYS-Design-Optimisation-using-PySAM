@@ -8,10 +8,10 @@ import os
 
 CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser":"fmincon",
+    "optimiser":"pygad_ga",
     
     # Initial guess
-    "x0": [75, 200],
+    "x0": [65, 200],
 
     # Bounds
     "lb": [50, 150],
