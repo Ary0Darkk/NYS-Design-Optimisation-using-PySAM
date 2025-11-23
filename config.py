@@ -8,7 +8,7 @@ import os
 
 CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser":"ga",
+    "optimiser":"pygad_ga",
     
     # Initial guess
     "x0": [67, 200],
@@ -25,6 +25,13 @@ CONFIG = {
         # "TrackingError"
     ],
     
+    # pygad-ga settings
+    "num_generations":1,
+    "sol_per_pop":4,
+    "num_parents_mating":1,
+    "mutation_num_genes":1,
+    "random_seed":None,
+    "verbose":True,
     # Optimization settings
     "algorithm": "sqp",
     "display": "iter",
