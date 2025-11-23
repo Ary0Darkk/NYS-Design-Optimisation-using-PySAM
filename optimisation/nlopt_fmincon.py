@@ -1,6 +1,7 @@
 import numpy as np
 import nlopt
 import mlflow
+import dagshub
 from config import CONFIG
 import simulation
 
@@ -16,7 +17,9 @@ def run_nlopt():
     """
     
     # database setup
-    # mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_tracking_uri("https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow")
+    dagshub.init(repo_owner='aryanvj787', repo_name='NYS-Design-Optimisation-using-PySAM', mlflow=True)
+
 
     # set experiment name
     mlflow.set_experiment("nlopt-fmincon-optimisation")

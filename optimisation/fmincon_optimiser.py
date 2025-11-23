@@ -1,5 +1,6 @@
 import matlab.engine
 import mlflow
+import dagshub
 from config import CONFIG
 from convert import convert
 
@@ -7,7 +8,8 @@ from convert import convert
 def run_fmincon_optimisation():
     
     # database setup
-    # mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_tracking_uri("https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow")
+    dagshub.init(repo_owner='aryanvj787', repo_name='NYS-Design-Optimisation-using-PySAM', mlflow=True)
 
     # set experiment name
     mlflow.set_experiment("fmincon-optimisation")
