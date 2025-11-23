@@ -1,11 +1,11 @@
 import numpy as np
 from scipy.optimize import minimize
-
-import config
+import mlflow
+from config import CONFIG
 import simulation
 
 
-def run_scipy_minimise(method="trust-constr", maxiter=200, verbose=3):
+def run_scipy_minimise():
     """
     fmincon-like constrained optimization using SciPy.
     Maximizes annual energy by minimizing negative energy.
@@ -28,32 +28,65 @@ def run_scipy_minimise(method="trust-constr", maxiter=200, verbose=3):
     result : OptimizeResult
         Full SciPy result object
     """
+    # database setup
+    # mlflow.set_tracking_uri("sqlite:///mlflow.db")
 
-    cfg = config.CONFIG
-    var_names = cfg["overrides"]
-    x0 = np.array(cfg["x0"], dtype=float)
-    lb = np.array(cfg["lb"], dtype=float)
-    ub = np.array(cfg["ub"], dtype=float)
+    # set experiment name
+    mlflow.set_experiment("scipy-minimise-ga-optimisation")
 
-    bounds = list(zip(lb, ub))
+    # set run name here
+    run_name = None
 
-    # ---- objective: minimize negative annual energy ----
-    def obj(x):
-        overrides = {var_names[i]: float(x[i]) for i in range(len(var_names))}
-        annual_energy = simulation.simulation.run_simulation(overrides)
-        return -float(annual_energy)
+    with mlflow.start_run(run_name=run_name):
+        
+        print('Running scipy minimise optimiser...')
+        
+        var_names = CONFIG["overrides"]
+        x0 = np.array(CONFIG["x0"], dtype=float)
+        lb = np.array(CONFIG["lb"], dtype=float)
+        ub = np.array(CONFIG["ub"], dtype=float)
+        
+        mlflow.log_params(
+            {
+                "Initial guess":x0,
+                "Lower Bound":lb,
+                "Upper Bound":ub,
+            }
+        )
 
-    # ---- solve ----
-    result = minimize(
-        obj,
-        x0=x0,
-        method=method,
-        bounds=bounds,
-        constraints=[],  # add NonlinearConstraint/LinearConstraint here if needed
-        options={"maxiter": maxiter, "verbose": verbose}
-    )
+        bounds = list(zip(lb, ub))
+        
+        mlflow.log_param("Bounds",bounds)
 
-    x_opt = result.x
-    max_energy = -result.fun
+        # ---- objective: minimize negative annual energy ----
+        def obj(x):
+            overrides = {var_names[i]: float(x[i]) for i in range(len(var_names))}
+            annual_energy = simulation.simulation.run_simulation(overrides)
+            return -float(annual_energy)
+        options = {
+            "maxiter": CONFIG["maxiter"], 
+            "verbose": CONFIG["verbose"],
+            }
+        mlflow.log_params(options)
+        # ---- solve ----
+        result = minimize(
+            obj,
+            x0=x0,
+            method=CONFIG["method"],
+            bounds=bounds,
+            constraints=[],  # add NonlinearConstraint/LinearConstraint here if needed
+            options=options
+        )
 
-    return x_opt, max_energy, result
+        x_opt = result.x
+        max_energy = -result.fun
+        
+        x_dict={}
+        for var,value in zip(CONFIG["overrides"],x_opt):
+            rav = var + " optimal value"
+            x_dict[rav] = float(value)
+        
+        mlflow.log_metrics(x_dict)
+        mlflow.log_metric("Optimal function Value",max_energy)
+
+        return x_opt, max_energy, result

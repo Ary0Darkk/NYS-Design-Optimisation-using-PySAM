@@ -8,7 +8,7 @@ import os
 
 CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser":"pygad_ga",
+    "optimiser":"scipy_min",
     
     # Initial guess
     "x0": [67, 200],
@@ -25,6 +25,10 @@ CONFIG = {
         # "TrackingError"
     ],
     
+    # scipy-ga settings
+    "method":"trust-constr",
+    "maxiter":2,
+    "verbose":3,
     # pygad-ga settings
     "num_generations":1,
     "sol_per_pop":4,
