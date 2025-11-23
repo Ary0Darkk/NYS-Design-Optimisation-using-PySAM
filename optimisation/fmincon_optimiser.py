@@ -3,16 +3,18 @@ import mlflow
 from config import CONFIG
 from convert import convert
 
-# database setup
-# mlflow.set_tracking_uri("sqlite:///mlflow.db")
-
-# set experiment name
-mlflow.set_experiment("fmincon-optimisation")
-
-# set run name here
-run_name = None
 
 def run_fmincon_optimisation():
+    
+    # database setup
+    # mlflow.set_tracking_uri("sqlite:///mlflow.db")
+
+    # set experiment name
+    mlflow.set_experiment("fmincon-optimisation")
+
+    # set run name here
+    run_name = None
+    
     # Start MATLAB
     eng = matlab.engine.start_matlab()
     

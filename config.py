@@ -8,10 +8,10 @@ import os
 
 CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser":"pygad_ga",
+    "optimiser":"ga",
     
     # Initial guess
-    "x0": [65, 200],
+    "x0": [67, 200],
 
     # Bounds
     "lb": [50, 150],
@@ -28,14 +28,14 @@ CONFIG = {
     # Optimization settings
     "algorithm": "sqp",
     "display": "iter",
-    "max_function_evaluation":100,    # default is 100*numberOfVariables
-    "max_iterations":400,             # default is 400 
-    "constraint_tolerance":1e-5,      # default -> 1e-6
-    "elite_count":5,                  # default -> {ceil(0.05*PopulationSize)}
-    "hybrid_fcn":"fmincon",           # Function that continues the optimization after ga terminates
-    "max_generations":200,            # default is {100*numberOfVariables} for ga
-    "pop_size" : 50,                  # default is {50} when numberOfVariables <= 5, {200} otherwise 
-    "use_parallel":True,              # Compute fitness and nonlinear constraint functions in parallel
+    "max_function_evaluation":1,    # default is 100*numberOfVariables
+    "max_iterations":1,             # default is 400 
+    "constraint_tolerance":1e-1,      # default -> 1e-6
+    "elite_count": 1,                  # default -> {ceil(0.05*PopulationSize)}
+    "hybrid_fcn":None,           # Function that continues the optimization after ga terminates
+    "max_generations":2,            # default is {100*numberOfVariables} for ga
+    "pop_size" : 5,                  # default is {50} when numberOfVariables <= 5, {200} otherwise 
+    "use_parallel":False,              # Compute fitness and nonlinear constraint functions in parallel
     
     # Function names INSIDE the MATLAB file
     "objective_name": "obj_function",
