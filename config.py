@@ -8,7 +8,7 @@ import os
 
 CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser":"scipy_min",
+    "optimiser":"nlopt",
     
     # Initial guess
     "x0": [67, 200],
@@ -24,6 +24,16 @@ CONFIG = {
         # "I_bn_des",
         # "TrackingError"
     ],
+    
+    # nlopt-fmincon settings
+    "nlopt_algorithm":"LD_SLSQP",
+    "maxeval":2,
+    "xtol_rel":1e-4,
+    "ftol_rel":1e-4,
+    "scale_to_unit":True,
+    "round_integers":False,
+    "x0_override":None,
+    "verbose":True,
     
     # scipy-ga settings
     "method":"trust-constr",
