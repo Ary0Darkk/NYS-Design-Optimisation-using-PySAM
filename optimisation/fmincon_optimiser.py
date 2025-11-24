@@ -13,9 +13,14 @@ def run_fmincon_optimisation():
 
     # set experiment name
     mlflow.set_experiment("fmincon-optimisation")
+    
+    # author tag
+    mlflow.set_tag(
+        "Author",CONFIG["author"]
+    )
 
     # set run name here
-    run_name = None
+    run_name = CONFIG["run_name"]
     
     # Start MATLAB
     eng = matlab.engine.start_matlab()

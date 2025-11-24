@@ -7,6 +7,11 @@ Modify values here only — all scripts will automatically use them.
 import os
 
 CONFIG = {
+    
+    # author name -> whenever run it write your name
+    "author": "Aryan",
+    "run_name":None,
+    
     # optimiser -> choose "ga" or "fmincon"
     "optimiser":"nlopt",
     

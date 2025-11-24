@@ -12,9 +12,14 @@ def run_ga_optimisation():
 
     # set experiment name
     mlflow.set_experiment("matlab-ga-optimisation")
+    
+    # author tag
+    mlflow.set_tag(
+        "Author",CONFIG["author"]
+    )
 
     # set run name here
-    run_name = None
+    run_name = CONFIG["run_name"]
     
     # Start MATLAB engine
     eng = matlab.engine.start_matlab()

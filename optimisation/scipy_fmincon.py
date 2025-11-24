@@ -35,9 +35,14 @@ def run_scipy_minimise():
 
     # set experiment name
     mlflow.set_experiment("scipy-minimise-ga-optimisation")
+    
+    # author tag
+    mlflow.set_tag(
+        "Author",CONFIG["author"]
+    )
 
     # set run name here
-    run_name = None
+    run_name = CONFIG["run_name"]
 
     with mlflow.start_run(run_name=run_name):
         
