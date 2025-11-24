@@ -34,6 +34,7 @@ def run_fmincon_optimisation():
             "MaxFunctionEvaluations":CONFIG["max_function_evaluation"],
             "MaxIterations": CONFIG["max_iterations"],
             "ConstraintTolerance":CONFIG["constraint_tolerance"],
+            "OptimalityTolerance":CONFIG["OptimalityTolerance"],
         }
 
         options = eng.optimoptions("fmincon")

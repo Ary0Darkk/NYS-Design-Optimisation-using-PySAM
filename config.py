@@ -27,7 +27,7 @@ CONFIG = {
     
     # nlopt-fmincon settings
     "nlopt_algorithm":"LD_SLSQP",
-    "maxeval":2,
+    "maxeval":3,
     "xtol_rel":1e-4,
     "ftol_rel":1e-4,
     "scale_to_unit":True,
@@ -48,7 +48,8 @@ CONFIG = {
     "verbose":True,
     # Optimization settings
     "algorithm": "sqp",
-    "display": "iter",
+    "display": "iter-detailed",
+    "OptimalityTolerance":1e-6,
     "max_function_evaluation":1,    # default is 100*numberOfVariables
     "max_iterations":1,             # default is 400 
     "constraint_tolerance":1e-1,      # default -> 1e-6
