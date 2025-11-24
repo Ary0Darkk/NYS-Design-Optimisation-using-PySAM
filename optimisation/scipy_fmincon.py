@@ -36,16 +36,19 @@ def run_scipy_minimise():
     # set experiment name
     mlflow.set_experiment("scipy-minimise-ga-optimisation")
     
-    # author tag
-    mlflow.set_tag(
-        "Author",CONFIG["author"]
-    )
-
+    # SAFETY: close any run that may be active from earlier imports/calls
+    if mlflow.active_run() is not None:
+        mlflow.end_run()
+    
     # set run name here
     run_name = CONFIG["run_name"]
 
     with mlflow.start_run(run_name=run_name):
         
+        # author tag
+        mlflow.set_tag(
+            "Author",CONFIG["author"]
+        )
         print('Running scipy minimise optimiser...')
         
         var_names = CONFIG["overrides"]

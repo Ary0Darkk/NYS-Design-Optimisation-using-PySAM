@@ -24,16 +24,20 @@ def run_nlopt():
     # set experiment name
     mlflow.set_experiment("nlopt-fmincon-optimisation")
     
-    # author tag
-    mlflow.set_tag(
-        "Author",CONFIG["author"]
-    )
-
+    # SAFETY: close any run that may be active from earlier imports/calls
+    if mlflow.active_run() is not None:
+        mlflow.end_run()
+    
     # set run name here
     run_name = CONFIG["run_name"]
 
     with mlflow.start_run(run_name=run_name):
         
+        
+        # author tag
+        mlflow.set_tag(
+            "Author",CONFIG["author"]
+        )
         var_names = CONFIG["overrides"]
 
         lb = np.array(CONFIG["lb"], dtype=float)

@@ -16,10 +16,11 @@ def run_pyga_optimisation():
     # set experiment name
     mlflow.set_experiment("Pygad-ga-optimisation")
     
-    # author tag
-    mlflow.set_tag(
-        "Author",CONFIG["author"]
-    )
+
+    # SAFETY: close any run that may be active from earlier imports/calls
+    if mlflow.active_run() is not None:
+        mlflow.end_run()
+    
 
     # set run name here
     run_name = CONFIG["run_name"]
@@ -27,6 +28,11 @@ def run_pyga_optimisation():
     
     with mlflow.start_run(run_name=run_name):
     
+        # author tag
+        mlflow.set_tag(
+            "Author",CONFIG["author"]
+        )
+        
         var_names = CONFIG["overrides"]
         print(type(var_names))
         print(len(var_names))

@@ -13,10 +13,10 @@ CONFIG = {
     "run_name":None,
     
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser":"nlopt",
+    "optimiser":"fmincon",
     
     # Initial guess
-    "x0": [67, 200],
+    "x0": [65, 200],
 
     # Bounds
     "lb": [50, 150],
