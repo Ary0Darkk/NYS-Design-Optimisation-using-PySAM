@@ -16,7 +16,7 @@ for i = 1:length(var_names)
 end
 
 % Call Python simulation
-annual_energy = py.simulation.simulation.run_simulation(overrides);
+sim_output = py.simulation.simulation.run_simulation(overrides);
 
-y = -double(annual_energy); % negate for maximization
+y = -double(sim_output); % negate for maximization
 end

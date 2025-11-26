@@ -4,6 +4,7 @@ import numpy as np
 import PySAM.TroughPhysical as TP
 
 from config import CONFIG
+from utilities.month_from_hrs import hrs_to_months
 
 
 
@@ -37,8 +38,8 @@ def run_simulation(overrides):
     
     sim_result = {
         "monthly_energy" : tp.Outputs.monthly_energy,
-        "pc_htf_pump_power" : tp.Outputs.cycle_htf_pump_power,
-        "field_htf_pump_power" : tp.Outputs.W_dot_field_pump,
+        "pc_htf_pump_power" : hrs_to_months(tp.Outputs.cycle_htf_pump_power),
+        "field_htf_pump_power" : hrs_to_months(tp.Outputs.W_dot_field_pump),
     }
     
     
