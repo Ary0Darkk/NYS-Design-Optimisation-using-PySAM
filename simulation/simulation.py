@@ -35,7 +35,14 @@ def run_simulation(overrides):
     tp.execute()
     # print('Simulation finished!')
     
+    sim_result = {
+        "monthly_energy" : tp.Outputs.monthly_energy,
+        "pc_htf_pump_power" : tp.Outputs.cycle_htf_pump_power,
+        "field_htf_pump_power" : tp.Outputs.W_dot_field_pump,
+    }
     
-    return float(tp.Outputs.annual_energy)   # dict of all outputs
+    
+    
+    return sim_result   # dict of all outputs
 
 
