@@ -1,4 +1,5 @@
 # env variables
+.venv
 
 # cache
 __pycache__

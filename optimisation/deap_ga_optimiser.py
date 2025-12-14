@@ -27,7 +27,7 @@ def run_deap_ga_optimisation():
 
     with mlflow.start_run(run_name=run_name):
 
-        # author tag
+        # ---- author tag ----
         mlflow.set_tag("Author", CONFIG["author"])
 
         var_names = CONFIG["overrides"]
@@ -41,7 +41,7 @@ def run_deap_ga_optimisation():
             "Upper Bound": ub,
         })
 
-        # DEAP setup
+        # ---- DEAP setup ----
         random_seed = CONFIG.get("random_seed", None)
         if random_seed is not None:
             random.seed(random_seed)
@@ -64,8 +64,8 @@ def run_deap_ga_optimisation():
         def fitness_func_individual(individual):
             # DEAP passes only the individual to the fitness function here
             overrides = {var_names[i]: float(individual[i]) for i in range(len(var_names))}
-            annual_energy = run_simulation(overrides)
-            return (float(annual_energy),)  # DEAP expects a tuple
+            sim_result = run_simulation(overrides)
+            return (float(sim_result["monthly_energy"][0]),)  # DEAP expects a tuple
 
         toolbox.register("evaluate", fitness_func_individual)
 
@@ -157,6 +157,7 @@ def run_deap_ga_optimisation():
 
         # Build a ga-like instance to return for introspection
         ga_instance = {
+            
             "toolbox": toolbox,
             "population": pop,
             "logbook": logbook,
