@@ -24,11 +24,27 @@ CONFIG = {
     
     # overrides
     "overrides": [
-        "T_startup",
-        "T_shutdown"
-        # "I_bn_des",
-        # "TrackingError"
+        "T_startup",      # startup temperature
+        "T_shutdown",     # shutdown temperature
+        "specified_total_aperture",   # total aperture area
+        "Row_Distance",    # row spacing
+        "ColperSCA",       # num of modules per SCA
+        "W_aperture",      # width of SCA
+        "L_SCA",           # length of collector assembly
     ],
+    
+    # deap-ga optimisation settings
+    "random_seed":21,
+    "tournament_size":3,
+    "mutation_num_genes":1,
+    "sol_per_pop":3,
+    "num_generations":2,
+    "cxpb":0.5,
+    "mutpb":0.2,
+    "verbose":True,
+    
+    
+    
     
     # nlopt-fmincon settings
     "nlopt_algorithm":"LD_SLSQP",

@@ -106,7 +106,7 @@ def run_deap_ga_optimisation():
             "mutpb": mutpb,
             "mutation_num_genes": CONFIG.get("mutation_num_genes", 1),
             "random_seed": random_seed,
-            "suppress_warnings": CONFIG.get("verbose", True)
+            "suppress_warnings": CONFIG.get("verbose", False)
         }
 
         # log config_vars to mlflow (flattened)
@@ -125,7 +125,7 @@ def run_deap_ga_optimisation():
         # run the evolutionary algorithm
         # we use eaSimple which applies selection, crossover (cxpb), mutation (mutpb) per generation
         pop, logbook = algorithms.eaSimple(pop, toolbox, cxpb=cxpb, mutpb=mutpb,
-                                           ngen=num_generations, stats=stats, verbose=CONFIG.get("verbose", True))
+                                           ngen=num_generations, stats=stats, verbose=CONFIG.get("verbose", False))
 
         # find best individual in final population
         best_ind = tools.selBest(pop, 1)[0]
