@@ -5,10 +5,11 @@ import dagshub
 from deap import base, creator, tools, algorithms
 from config import CONFIG
 from simulation.simulation import run_simulation
-from objective_functions.objective_func import objective_function
+# from objective_functions.objective_func import objective_function
 
 
-def run_deap_ga_optimisation():
+def run_deap_ga_optimisation(override:list[str],
+                             static_overrides:dict[str,float]):
     """
     Runs GA (DEAP) to maximize annual energy.
     Returns: best_solution (list), best_fitness (float), ga_instance (dict)
@@ -37,9 +38,9 @@ def run_deap_ga_optimisation():
         # ---- author tag ----
         mlflow.set_tag("Author", CONFIG["author"])
 
-        var_names = CONFIG["overrides"]
-        print(type(var_names))
-        print(len(var_names))
+        var_names = CONFIG[override]
+        # print(type(var_names))
+        # print(len(var_names))
         lb = CONFIG["lb"]
         ub = CONFIG["ub"]
 
@@ -77,7 +78,8 @@ def run_deap_ga_optimisation():
             overrides = {
                 var_names[i]: float(individual[i]) for i in range(len(var_names))
             }
-            sim_result = run_simulation(overrides)
+            final_overrides = overrides | static_overrides
+            sim_result = run_simulation(final_overrides)
             return (float(sim_result["monthly_energy"][0]),)  # DEAP expects a tuple
 
         toolbox.register("evaluate", fitness_func_individual)
@@ -174,7 +176,7 @@ def run_deap_ga_optimisation():
             best_match_idx = -1
 
         x_dict = {}
-        for var, value in zip(CONFIG["overrides"], best_solution):
+        for var, value in zip(CONFIG[override], best_solution):
             rav = var + " optimal value"
             x_dict[rav] = float(value)
 

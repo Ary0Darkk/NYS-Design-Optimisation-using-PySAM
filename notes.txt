@@ -23,3 +23,7 @@ Find out about these variables:
 3. System net electrical power and why it is negative of field htf pump power?
 4. How to convert MWe to kWh?
 5. What is PPA price multiplier? And difference between retail price and market price?
+
+Now I am thinking how can I perform these two optimisation sequentially.
+
+I am creating a router file that routes through both kind of optimisation

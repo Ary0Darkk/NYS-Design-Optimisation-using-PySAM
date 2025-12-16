@@ -1,4 +1,7 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+
+# TODO: scale demand data to get unit price data
 
 df = pd.read_excel(
     "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx"
@@ -30,3 +33,9 @@ formatted_demand_df = df_2024_no_leap[
 
 # print(formatted_demand_df.head())
 # print(len(formatted_demand_df))
+
+plt.plot(formatted_demand_df['DateTime'],formatted_demand_df['Hourly Demand Met (in MW)'])
+# plt.show()
+
+print(max(formatted_demand_df['Hourly Demand Met (in MW)']))
+print(min(formatted_demand_df['Hourly Demand Met (in MW)']))
