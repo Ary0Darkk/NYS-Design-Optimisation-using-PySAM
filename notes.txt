@@ -1,0 +1,25 @@
+2025-12-16
+I need to perform both design as well as operational optimisation. Starting from design optimisation, I need to select control variables. Here it is:
+1. Field Aperture Area/Solar multiple
+2. Row spacing
+3. Number of modules per assembly
+4. Aperture width
+5. Length of Collector assembly
+6. Number of SCA per loop
+
+
+Talking about control variables that we are going to consider for operational optimisation:
+1. Mass flow rate
+2. Startup Temperature
+3. Shutdown Temperature
+
+After all this, how we are going to perform this task
+
+1 Mwe = 1000 kW
+
+Find out about these variables:
+1. System power generated
+2. PC HTF pump power and why it is always zero?
+3. System net electrical power and why it is negative of field htf pump power?
+4. How to convert MWe to kWh?
+5. What is PPA price multiplier? And difference between retail price and market price?

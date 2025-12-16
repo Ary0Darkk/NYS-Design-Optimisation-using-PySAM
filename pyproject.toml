@@ -14,4 +14,6 @@ dependencies = [
     "nrel-pysam>=7.1.0",
     "openpyxl>=3.1.5",
     "pygad>=3.5.0",
+    "pylint>=4.0.4",
+    "ruff>=0.14.9",
 ]

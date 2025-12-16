@@ -6,5 +6,8 @@ __pycache__
 simulation/__pycache__
 optimisation/__pycache__
 
+# ruff-linter cache
+.ruff_cache
+
 # mlflow local runs
 mlruns

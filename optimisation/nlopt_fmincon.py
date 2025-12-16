@@ -15,41 +15,47 @@ def run_nlopt():
         best_energy (float): max annual energy
         opt (nlopt.opt): optimizer object
     """
-    
-    # database setup
-    mlflow.set_tracking_uri("https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow")
-    dagshub.init(repo_owner='aryanvj787', repo_name='NYS-Design-Optimisation-using-PySAM', mlflow=True)
 
+    # database setup
+    mlflow.set_tracking_uri(
+        "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
+    )
+    dagshub.init(
+        repo_owner="aryanvj787",
+        repo_name="NYS-Design-Optimisation-using-PySAM",
+        mlflow=True,
+    )
 
     # set experiment name
     mlflow.set_experiment("nlopt-fmincon-optimisation")
-    
+
     # SAFETY: close any run that may be active from earlier imports/calls
     if mlflow.active_run() is not None:
         mlflow.end_run()
-    
+
     # set run name here
     run_name = CONFIG["run_name"]
 
     with mlflow.start_run(run_name=run_name):
-        
-        
         # author tag
-        mlflow.set_tag(
-            "Author",CONFIG["author"]
-        )
+        mlflow.set_tag("Author", CONFIG["author"])
         var_names = CONFIG["overrides"]
 
         lb = np.array(CONFIG["lb"], dtype=float)
         ub = np.array(CONFIG["ub"], dtype=float)
 
-        x0_real = np.array(CONFIG["x0_override"] if CONFIG["x0_override"] is not None else CONFIG["x0"], dtype=float)
-        
+        x0_real = np.array(
+            CONFIG["x0_override"]
+            if CONFIG["x0_override"] is not None
+            else CONFIG["x0"],
+            dtype=float,
+        )
+
         mlflow.log_params(
             {
-                "lower bound":lb,
-                "upper bound":ub,
-                "x0_real":x0_real,
+                "lower bound": lb,
+                "upper bound": ub,
+                "x0_real": x0_real,
             }
         )
 
@@ -88,7 +94,11 @@ def run_nlopt():
         # ---------- objective ----------
         def objective(x_opt, grad):
             # map to real space if scaling
-            x_real = from_unit(x_opt) if CONFIG["scale_to_unit"] else np.array(x_opt, dtype=float)
+            x_real = (
+                from_unit(x_opt)
+                if CONFIG["scale_to_unit"]
+                else np.array(x_opt, dtype=float)
+            )
 
             if CONFIG["round_integers"]:
                 x_real = np.array([int(round(v)) for v in x_real], dtype=float)
@@ -114,7 +124,11 @@ def run_nlopt():
         x_opt_found = opt.optimize(x0_opt)
         best_energy = opt.last_optimum_value()
 
-        x_opt_real = from_unit(x_opt_found) if CONFIG["scale_to_unit"] else np.array(x_opt_found, dtype=float)
+        x_opt_real = (
+            from_unit(x_opt_found)
+            if CONFIG["scale_to_unit"]
+            else np.array(x_opt_found, dtype=float)
+        )
         if CONFIG["round_integers"]:
             x_opt_real = np.array([int(round(v)) for v in x_opt_real], dtype=float)
 
@@ -131,7 +145,7 @@ def run_nlopt():
             print(x_dict)
             print("Max annual energy:", best_energy)
         mlflow.log_metrics(x_dict)
-        mlflow.log_metric("Optimal function value",best_energy)
+        mlflow.log_metric("Optimal function value", best_energy)
 
         return x_opt_real, best_energy, opt
 

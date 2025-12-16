@@ -1,7 +1,7 @@
 import matlab
 
-def convert(value):
 
+def convert(value):
     if isinstance(value, (int, float, str, bool, type(None))):
         return value
 
@@ -15,7 +15,7 @@ def convert(value):
         if (rows, cols) == (1, 1):
             data = value._data[0]
 
-            if isinstance(data, list):     # MATLAB bug case
+            if isinstance(data, list):  # MATLAB bug case
                 try:
                     return [float(x) for x in data]  # vector
                 except:
@@ -28,10 +28,7 @@ def convert(value):
             return [float(x) for x in value._data]
 
         # matrix
-        return [
-            [float(value[r][c]) for c in range(cols)]
-            for r in range(rows)
-        ]
+        return [[float(value[r][c]) for c in range(cols)] for r in range(rows)]
 
     if isinstance(value, matlab.logical):
         return bool(value[0][0])

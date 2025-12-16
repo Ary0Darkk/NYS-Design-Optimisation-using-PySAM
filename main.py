@@ -8,7 +8,7 @@ from config import CONFIG
 
 import argparse
 import glob
-import os  
+import os
 
 
 def load_repro_config(path):
@@ -21,6 +21,7 @@ def load_repro_config(path):
     else:
         raise ValueError("Unsupported repro config format")
 
+
 def find_latest_downloaded_config():
     files = sorted(
         glob.glob("downloaded_run_artifacts/*.py"),
@@ -28,16 +29,17 @@ def find_latest_downloaded_config():
         reverse=True,
     )
     if not files:
-        raise FileNotFoundError("No downloaded config found in downloaded_run_artifacts/")
+        raise FileNotFoundError(
+            "No downloaded config found in downloaded_run_artifacts/"
+        )
     return files[0]
 
 
 def main():
-    
     # simulation
     # sim_output = run_simulation()
     # print(f'Annual Energy : {sim_output["annual_energy"]}')
-    
+
     # FIXME : try and catch is not working as expected,
     # look at keyboard interupt working
     try:
@@ -57,17 +59,21 @@ def main():
         elif CONFIG["optimiser"] == "deap_ga":
             x_opt, f_val, _ = run_deap_ga_optimisation()
         # disp optimal values
-        print(f'x_opt : {x_opt} \nf_val : {f_val}')
+        print(f"x_opt : {x_opt} \nf_val : {f_val}")
     except KeyboardInterrupt:
-        print('\n\nOptimization interrupted by user. Stopping...\n')
+        print("\n\nOptimization interrupted by user. Stopping...\n")
     except Exception as e:
-        print('Unexpected error :',e)
-    
-    
-if __name__ == "__main__":
+        print("Unexpected error :", e)
 
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repro", nargs="?", const="AUTO", help="Reproduce using downloaded config. Use AUTO for latest.")
+    parser.add_argument(
+        "--repro",
+        nargs="?",
+        const="AUTO",
+        help="Reproduce using downloaded config. Use AUTO for latest.",
+    )
     args = parser.parse_args()
 
     # override CONFIG if repro mode is used
