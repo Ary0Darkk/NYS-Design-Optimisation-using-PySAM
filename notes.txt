@@ -27,3 +27,6 @@ Find out about these variables:
 Now I am thinking how can I perform these two optimisation sequentially.
 
 I am creating a router file that routes through both kind of optimisation
+
+2025-12-17
+We have built operational and design optimisation logic and also how can we do it sequentially.
