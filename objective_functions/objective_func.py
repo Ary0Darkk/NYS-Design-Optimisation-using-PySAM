@@ -21,18 +21,18 @@ def objective_function(
 
     # convert them into df
     hourly_energy_df = pd.Series(hourly_energy, name="hourly_energy")
-    print(hourly_energy_df.head())
     field_htf_pump_power_df = pd.Series(
         field_htf_pump_power, name="field_htf_pump_power"
     )
     print(field_htf_pump_power_df.head())
     pc_htf_pump_power_df = pd.Series(pc_htf_pump_power, name="pc_htf_pump_power")
-    print(pc_htf_pump_power_df.head())
 
     # access final dataset
     final_dataset = get_dynamic_price()
     dynamic_price_df = final_dataset["dynamic price"]
-    print(dynamic_price_df.head())
+    # print(hourly_energy_df.head())
+    # print(pc_htf_pump_power_df.head())
+    # print(dynamic_price_df.head())
 
     obj = (
         hourly_energy_df * dynamic_price_df
@@ -40,6 +40,6 @@ def objective_function(
         - pc_htf_pump_power_df * dynamic_price_df
     )
 
-    print(obj.head())
+    # print(obj.head())
 
     return obj
