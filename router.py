@@ -6,28 +6,24 @@ from optimisation.scipy_fmincon import run_scipy_minimise
 from optimisation.nlopt_fmincon import run_nlopt
 from optimisation.deap_ga_optimiser import run_deap_ga_optimisation
 
-from simulation.simulation import run_simulation
 from config import CONFIG
 
 
-def optimisation_mode()->str:
+def optimisation_mode() -> str:
     override = None
     if CONFIG["route"] == "design":
-       override = "deisgn_overrides"
+        override = "deisgn_overrides"
     elif CONFIG["route"] == "operational":
         override = "operational_overrides"
     elif CONFIG["route"] == "des-operational":
         override = "deisgn_operational"
     else:
-        print(f'{CONFIG["route"]} : Not found! ')
-    
+        print(f"{CONFIG['route']} : Not found! ")
+
     return override
 
 
-def call_optimiser(
-        override:list[float],
-        static_overrides:dict[str,float]
-):
+def call_optimiser(override: list[float], static_overrides: dict[str, float]):
     # FIXME : try and catch is not working as expected,
     # look at keyboard interupt working
     try:
@@ -45,9 +41,11 @@ def call_optimiser(
         elif CONFIG["optimiser"] == "scipy_min":
             x_opt, f_val, _ = run_scipy_minimise()
         elif CONFIG["optimiser"] == "deap_ga":
-            x_opt, f_val, _ = run_deap_ga_optimisation(override=override,static_overrides=static_overrides)
+            x_opt, f_val, _ = run_deap_ga_optimisation(
+                override=override, static_overrides=static_overrides
+            )
         else:
-            print(f'{CONFIG["optimiser"]} : Not an optimiser')
+            print(f"{CONFIG['optimiser']} : Not an optimiser")
         # disp optimal values
         print(f"x_opt : {x_opt} \nf_val : {f_val}")
     except KeyboardInterrupt:
@@ -55,16 +53,15 @@ def call_optimiser(
     except Exception as e:
         print("Unexpected error :", e)
 
-    return x_opt,f_val
+    return x_opt, f_val
 
 
-def main():
-
+def run_router():
     # design and operational optim logic
     optimals = None
 
     override = optimisation_mode()
-    print(f'Optimisation mode : {override}')
+    print(f"Optimisation mode : {override}")
 
     # only perfoms single optim
     if override != "deisgn_operational":
@@ -74,14 +71,11 @@ def main():
         optimals = call_optimiser(override="deisgn_overrides")
 
         if optimals is not None:
-            design_dict = dict(zip(CONFIG["deisgn_overrides"],optimals[0]))
+            design_dict = dict(zip(CONFIG["deisgn_overrides"], optimals[0]))
 
-            call_optimiser(override="operational_overrides",
-                           static_overrides=design_dict)
-            
+            call_optimiser(
+                override="operational_overrides", static_overrides=design_dict
+            )
+
         else:
-            print('Design optimisation is not performed yet!')
-
-
-if __name__ == "__main__":
-    main()
+            print("Design optimisation is not performed yet!")

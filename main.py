@@ -1,5 +1,5 @@
 from config import CONFIG
-
+from router import run_router
 import argparse
 import glob
 import os
@@ -30,7 +30,8 @@ def find_latest_downloaded_config():
 
 
 def main():
-    pass
+    # runs router
+    run_router()
 
 
 if __name__ == "__main__":

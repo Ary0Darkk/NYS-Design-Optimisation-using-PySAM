@@ -8,8 +8,7 @@ from simulation.simulation import run_simulation
 # from objective_functions.objective_func import objective_function
 
 
-def run_deap_ga_optimisation(override:list[str],
-                             static_overrides:dict[str,float]):
+def run_deap_ga_optimisation(override: list[str], static_overrides: dict[str, float]):
     """
     Runs GA (DEAP) to maximize annual energy.
     Returns: best_solution (list), best_fitness (float), ga_instance (dict)
