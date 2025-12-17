@@ -1,4 +1,6 @@
 # file to route design optimisation and operational one
+from typing import Optional
+
 from optimisation.ga_optimiser import run_ga_optimisation
 from optimisation.fmincon_optimiser import run_fmincon_optimisation
 from optimisation.pygad_ga_optimiser import run_pyga_optimisation
@@ -23,35 +25,46 @@ def optimisation_mode() -> str:
     return override
 
 
-def call_optimiser(override: list[float], static_overrides: dict[str, float]):
+def call_optimiser(
+    override: list[float], static_overrides: Optional[dict[str, float]] = None
+):
     # FIXME : try and catch is not working as expected,
     # look at keyboard interupt working
+    if static_overrides is None:
+        static_overrides = {}
+
+    # initilise return variables
+    x_opt = None
+    f_val = None
+
     try:
         # optimisation
-        if CONFIG["optimiser"] == "fmincon":
+        opt_type = CONFIG.get("optimiser")
+
+        if opt_type == "fmincon":
             x_opt, f_val = run_fmincon_optimisation()
-        elif CONFIG["optimiser"] == "ga":
+        elif opt_type == "ga":
             x_opt, f_val = run_ga_optimisation()
-        elif CONFIG["optimiser"] == "pygad_ga":
+        elif opt_type == "pygad_ga":
             x_opt, f_val, _ = run_pyga_optimisation()
-        elif CONFIG["optimiser"] == "nlopt":
+        elif opt_type == "nlopt":
             x_opt, f_val, _ = run_nlopt()
-        elif CONFIG["optimiser"] == "scipy_min":
+        elif opt_type == "scipy_min":
             x_opt, f_val, _ = run_scipy_minimise()
-        elif CONFIG["optimiser"] == "scipy_min":
-            x_opt, f_val, _ = run_scipy_minimise()
-        elif CONFIG["optimiser"] == "deap_ga":
+        elif opt_type == "deap_ga":
             x_opt, f_val, _ = run_deap_ga_optimisation(
                 override=override, static_overrides=static_overrides
             )
         else:
-            print(f"{CONFIG['optimiser']} : Not an optimiser")
-        # disp optimal values
-        print(f"x_opt : {x_opt} \nf_val : {f_val}")
+            print(f"{opt_type} : Not a valid optimiser name in CONFIG")
+        # only print if the variables were successfully set
+        if x_opt is not None:
+            print(f"x_opt : {x_opt} \nf_val : {f_val}")
+
     except KeyboardInterrupt:
         print("\n\nOptimization interrupted by user. Stopping...\n")
-    except Exception as e:
-        print("Unexpected error :", e)
+    # except Exception as e:
+    #     print("Unexpected error :", e)
 
     return x_opt, f_val
 

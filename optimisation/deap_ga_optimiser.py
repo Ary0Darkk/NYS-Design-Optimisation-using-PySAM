@@ -5,7 +5,7 @@ import dagshub
 from deap import base, creator, tools, algorithms
 from config import CONFIG
 from simulation.simulation import run_simulation
-# from objective_functions.objective_func import objective_function
+from objective_functions.objective_func import objective_function
 
 
 def run_deap_ga_optimisation(override: list[str], static_overrides: dict[str, float]):
@@ -74,12 +74,20 @@ def run_deap_ga_optimisation(override: list[str], static_overrides: dict[str, fl
         # ---- fitness function ----
         def fitness_func_individual(individual):
             # DEAP passes only the individual to the fitness function here
-            overrides = {
+            t_overrides = {
                 var_names[i]: float(individual[i]) for i in range(len(var_names))
             }
-            final_overrides = overrides | static_overrides
+            final_overrides = {**t_overrides, **static_overrides}
             sim_result = run_simulation(final_overrides)
-            return (float(sim_result["monthly_energy"][0]),)  # DEAP expects a tuple
+            obj = objective_function(
+                sim_result["hourly_energy"],
+                sim_result["pc_htf_pump_power"],
+                sim_result["field_htf_pump_power"],
+            )
+            # print(type(obj))
+            # print(len(obj))
+            # print(obj.head(10))
+            return (float(obj[0]),)  # DEAP expects a tuple
 
         toolbox.register("evaluate", fitness_func_individual)
 

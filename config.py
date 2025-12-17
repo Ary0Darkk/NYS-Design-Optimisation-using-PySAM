@@ -14,23 +14,23 @@ CONFIG = {
     "show_demand_plot": False,
     # optimiser -> choose "ga" or "fmincon"
     "optimiser": "deap_ga",  # Initial guess
-    "route": "design",
+    "route": "operational",
     "x0": [65, 200],
     # Bounds
     "lb": [50, 150],
     "ub": [100, 250],
     # overrides
     "deisgn_overrides": [
-        "specified_total_aperture",  # total aperture area
-        "Row_Distance",  # row spacing
-        "ColperSCA",  # num of modules per SCA
-        "W_aperture",  # width of SCA
-        "L_SCA",  # length of collector assembly
-        "nSCA",  # number of SCA per loop
+        # "specified_total_aperture",  # total aperture area
+        # "Row_Distance",  # row spacing
+        # "ColperSCA",  # num of modules per SCA
+        # "W_aperture",  # width of SCA
+        # "L_SCA",  # length of collector assembly
+        # "nSCA",  # number of SCA per loop
     ],
     "operational_overrides": [
-        "m_dot_htfmin",  # min mass-flow rate
-        "m_dot_htfmax",  # max mass-flow rate
+        # "m_dot_htfmin",  # min mass-flow rate
+        # "m_dot_htfmax",  # max mass-flow rate
         "T_startup",  # startup temp
         "T_shutdown",  # shutdown temp
     ],
