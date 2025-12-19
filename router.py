@@ -9,16 +9,18 @@ from optimisation.nlopt_fmincon import run_nlopt
 from optimisation.deap_ga_optimiser import run_deap_ga_optimisation
 
 from config import CONFIG
+import mlflow
+import dagshub
 
 
-def optimisation_mode() -> str:
+def optimisation_mode() -> str | dict[str, list[float]]:
     override = None
     if CONFIG["route"] == "design":
-        override = "deisgn_overrides"
+        override = CONFIG["design"]
     elif CONFIG["route"] == "operational":
-        override = "operational_overrides"
+        override = CONFIG["operational_overrides"]
     elif CONFIG["route"] == "des-operational":
-        override = "deisgn_operational"
+        override = "design_operational"
     else:
         print(f"{CONFIG['route']} : Not found! ")
 
@@ -26,7 +28,9 @@ def optimisation_mode() -> str:
 
 
 def call_optimiser(
-    override: list[float], static_overrides: Optional[dict[str, float]] = None
+    override: dict[str, list[float]],
+    is_nested: bool,
+    static_overrides: Optional[dict[str, float]] = None,
 ):
     # FIXME : try and catch is not working as expected,
     # look at keyboard interupt working
@@ -53,7 +57,9 @@ def call_optimiser(
             x_opt, f_val, _ = run_scipy_minimise()
         elif opt_type == "deap_ga":
             x_opt, f_val, _ = run_deap_ga_optimisation(
-                override=override, static_overrides=static_overrides
+                override=override,
+                static_overrides=static_overrides,
+                is_nested=is_nested,
             )
         else:
             print(f"{opt_type} : Not a valid optimiser name in CONFIG")
@@ -70,25 +76,54 @@ def call_optimiser(
 
 
 def run_router():
+    # database setup
+    mlflow.set_tracking_uri(
+        "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
+    )
+    dagshub.init(
+        repo_owner="aryanvj787",
+        repo_name="NYS-Design-Optimisation-using-PySAM",
+        mlflow=True,
+    )
+
+    # optimisation
+    opt_type = CONFIG.get("optimiser")
+
+    # set experiment name
+    mlflow.set_experiment(f"{opt_type}-optimisation")
+
     # design and operational optim logic
     optimals = None
 
     override = optimisation_mode()
-    print(f"Optimisation mode : {override}")
 
     # only perfoms single optim
-    if override != "deisgn_operational":
-        call_optimiser(override)
+    if override != "design_operational":
+        print(f"{CONFIG['route']} optimisation started !")
+        print(f"Optimisation of : {override}")
+        call_optimiser(override, is_nested=False)
     # perform both optim in sequence
     else:
-        optimals = call_optimiser(override="deisgn_overrides")
-
-        if optimals is not None:
-            design_dict = dict(zip(CONFIG["deisgn_overrides"], optimals[0]))
-
-            call_optimiser(
-                override="operational_overrides", static_overrides=design_dict
+        is_nested = True  # informs mlflow for multi-step run
+        # 1. Start a Parent Run to group everything
+        with mlflow.start_run(run_name="Sequential des-operational"):
+            print(
+                "Going to begin Design plus Operational optimisation sequentially!\n\n"
             )
+            print(f"Design optimisation started !")
+            print(f"Optimisation of : {override}")
+            optimals = call_optimiser(override=CONFIG["design"], is_nested=is_nested)
 
-        else:
-            print("Design optimisation is not performed yet!")
+            if optimals is not None:
+                design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
+
+                print(f"Operational optimisation started !")
+                print(f"Optimisation of : {override}")
+                call_optimiser(
+                    override=CONFIG["operational"],
+                    static_overrides=design_dict,
+                    is_nested=is_nested,
+                )
+
+            else:
+                print("Design optimisation is not performed yet!")

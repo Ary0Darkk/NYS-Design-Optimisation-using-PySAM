@@ -4,6 +4,7 @@ Global configuration file for the optimization project.
 Modify values here only — all scripts will automatically use them.
 """
 
+# FIXME: Need to find variable name for "Number of SCA per loop"
 import os
 
 CONFIG = {
@@ -15,26 +16,34 @@ CONFIG = {
     "show_price_plot": False,
     # optimiser -> choose "ga" or "fmincon"
     "optimiser": "deap_ga",  # Initial guess
-    "route": "design",
-    "x0": [10, 4, 2, 40, 3],
-    # Bounds
-    "lb": [5, 2, 1, 20, 1],
-    "ub": [20, 10, 10, 120, 5],
+    "route": "design",  # des-operational
     # overrides
-    "deisgn_overrides": [
-        # "specified_total_aperture",  # total aperture area
-        "Row_Distance",  # row spacing
-        "ColperSCA",  # num of modules per SCA
-        "W_aperture",  # width of SCA
-        "L_SCA",  # length of collector assembly
-        # "nSCA",  # number of SCA per loop
-    ],
-    "operational_overrides": [
-        "m_dot_htfmin",  # min mass-flow rate
-        "m_dot_htfmax",  # max mass-flow rate
-        "T_startup",  # startup temp
-        "T_shutdown",  # shutdown temp
-    ],
+    "design": {
+        "overrides": [
+            # "specified_total_aperture",  # total aperture area
+            "Row_Distance",  # row spacing
+            "ColperSCA",  # num of modules per SCA
+            "W_aperture",  # width of SCA
+            "L_SCA",  # length of collector assembly
+            # "nSCA",  # number of SCA per loop
+        ],
+        # Bounds
+        "x0": [10, 4, 2, 40, 3],
+        "lb": [5, 2, 1, 20, 1],
+        "ub": [20, 10, 10, 120, 5],
+    },
+    "operational": {
+        "overrides": [
+            # "m_dot_htfmin",  # min mass-flow rate
+            # "m_dot_htfmax",  # max mass-flow rate
+            "T_startup",  # startup temp
+            "T_shutdown",  # shutdown temp
+        ],
+        # Bounds
+        "x0": [40, 40],
+        "lb": [30, 35],
+        "ub": [100, 120],
+    },
     # deap-ga optimisation settings
     "random_seed": 21,
     "tournament_size": 3,

@@ -8,40 +8,42 @@ from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
 
 
-def run_deap_ga_optimisation(override: list[str], static_overrides: dict[str, float]):
+def run_deap_ga_optimisation(
+    override, static_overrides: dict[str, float], is_nested: bool
+):
     """
     Runs GA (DEAP) to maximize annual energy.
     Returns: best_solution (list), best_fitness (float), ga_instance (dict)
     """
-    # database setup
-    mlflow.set_tracking_uri(
-        "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
-    )
-    dagshub.init(
-        repo_owner="aryanvj787",
-        repo_name="NYS-Design-Optimisation-using-PySAM",
-        mlflow=True,
-    )
+    # # database setup
+    # mlflow.set_tracking_uri(
+    #     "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
+    # )
+    # dagshub.init(
+    #     repo_owner="aryanvj787",
+    #     repo_name="NYS-Design-Optimisation-using-PySAM",
+    #     mlflow=True,
+    # )
 
     # set experiment name
-    mlflow.set_experiment("Deap-ga-optimisation")
+    # mlflow.set_experiment("Deap-ga-optimisation")
 
     # SAFETY: close any run that may be active from earlier imports/calls
-    if mlflow.active_run() is not None:
+    if mlflow.active_run() and not is_nested:
         mlflow.end_run()
 
     # set run name here
     run_name = CONFIG["run_name"]
 
-    with mlflow.start_run(run_name=run_name):
+    with mlflow.start_run(run_name=run_name, nested=is_nested):
         # ---- author tag ----
         mlflow.set_tag("Author", CONFIG["author"])
 
-        var_names = CONFIG[override]
+        var_names = override["overrides"]
         # print(type(var_names))
         # print(len(var_names))
-        lb = CONFIG["lb"]
-        ub = CONFIG["ub"]
+        lb = override["lb"]
+        ub = override["ub"]
 
         mlflow.log_params(
             {
@@ -57,8 +59,16 @@ def run_deap_ga_optimisation(override: list[str], static_overrides: dict[str, fl
             np.random.seed(random_seed)
 
         # create Maximizing fitness and Individual
-        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        creator.create("Individual", list, fitness=creator.FitnessMax)
+        # creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+        # creator.create("Individual", list, fitness=creator.FitnessMax)
+
+        # Create Maximizing fitness only if it doesn't exist
+        if not hasattr(creator, "FitnessMax"):
+            creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+
+        # Create Individual only if it doesn't exist
+        if not hasattr(creator, "Individual"):
+            creator.create("Individual", list, fitness=creator.FitnessMax)
 
         toolbox = base.Toolbox()
 
@@ -183,7 +193,7 @@ def run_deap_ga_optimisation(override: list[str], static_overrides: dict[str, fl
             best_match_idx = -1
 
         x_dict = {}
-        for var, value in zip(CONFIG[override], best_solution):
+        for var, value in zip(override["overrides"], best_solution):
             rav = var + " optimal value"
             x_dict[rav] = float(value)
 
