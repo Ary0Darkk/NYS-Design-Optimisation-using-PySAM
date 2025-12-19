@@ -4,8 +4,6 @@ from pathlib import Path
 
 from config import CONFIG
 
-# TODO: scale demand data to get unit price data
-
 
 def format_data(file_path: str, show_demand_plot: bool):
     df = pd.read_excel(Path(file_path))
@@ -42,7 +40,9 @@ def format_data(file_path: str, show_demand_plot: bool):
 
 
 def calc_dynamic_price(
-    demand_data: pd.DataFrame, min_price: float = 7, max_price: float = 15
+    demand_data: pd.DataFrame,
+    min_price: float = 7,
+    max_price: float = 15,
 ):
     # define min and max of demand data
     min_demand = demand_data.min()
@@ -57,7 +57,9 @@ def calc_dynamic_price(
         min_price + ((demand_data - min_demand) / demand_range) * price_range
     )
 
-    return dynamic_price.clip(lower=min_price, upper=max_price)
+    dynamic_price_df = dynamic_price.clip(lower=min_price, upper=max_price)
+
+    return dynamic_price_df
 
 
 def get_dynamic_price() -> pd.DataFrame:
@@ -72,6 +74,13 @@ def get_dynamic_price() -> pd.DataFrame:
     dynamic_price_data_df = dynamic_price_data.to_frame(name="dynamic price")
 
     final_dataset = pd.concat([formatted_data, dynamic_price_data_df], axis=1)
+
+    if CONFIG["show_price_plot"] is True:
+        plt.plot(
+            final_dataset["DateTime"],
+            final_dataset["dynamic price"],
+        )
+        plt.show()
 
     # print(dynamic_price_data.head())
     # print(type(dynamic_price_data))
