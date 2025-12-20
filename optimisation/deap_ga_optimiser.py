@@ -1,8 +1,16 @@
 import random
 import numpy as np
 import mlflow
-import dagshub
+import pickle
+import sys
+from pathlib import Path
 from deap import base, creator, tools, algorithms
+
+# Setup path to internal modules
+root_path = str(Path(__file__).resolve().parent.parent)
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
 from config import CONFIG
 from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
@@ -11,68 +19,31 @@ from objective_functions.objective_func import objective_function
 def run_deap_ga_optimisation(
     override, static_overrides: dict[str, float], is_nested: bool
 ):
-    """
-    Runs GA (DEAP) to maximize annual energy.
-    Returns: best_solution (list), best_fitness (float), ga_instance (dict)
-    """
-    # # database setup
-    # mlflow.set_tracking_uri(
-    #     "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
-    # )
-    # dagshub.init(
-    #     repo_owner="aryanvj787",
-    #     repo_name="NYS-Design-Optimisation-using-PySAM",
-    #     mlflow=True,
-    # )
+    # ---- SETUP DEAP GLOBALS ----
+    if not hasattr(creator, "FitnessMax"):
+        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+    if not hasattr(creator, "Individual"):
+        creator.create("Individual", list, fitness=creator.FitnessMax)
 
-    # set experiment name
-    # mlflow.set_experiment("Deap-ga-optimisation")
-
-    # SAFETY: close any run that may be active from earlier imports/calls
+    # ---- MLFLOW SETUP ----
     if mlflow.active_run() and not is_nested:
         mlflow.end_run()
 
-    # set run name here
     run_name = CONFIG["run_name"]
 
     with mlflow.start_run(run_name=run_name, nested=is_nested):
-        # ---- author tag ----
         mlflow.set_tag("Author", CONFIG["author"])
 
         var_names = override["overrides"]
-        # print(type(var_names))
-        # print(len(var_names))
-        lb = override["lb"]
-        ub = override["ub"]
+        lb, ub = override["lb"], override["ub"]
+        pop_size = CONFIG["sol_per_pop"]
+        num_generations = CONFIG["num_generations"]
+        cxpb = CONFIG.get("cxpb", 0.5)
+        mutpb = CONFIG.get("mutpb", 0.2)
 
-        mlflow.log_params(
-            {
-                "Lower Bound": lb,
-                "Upper Bound": ub,
-            }
-        )
-
-        # ---- DEAP setup ----
-        random_seed = CONFIG.get("random_seed", None)
-        if random_seed is not None:
-            random.seed(random_seed)
-            np.random.seed(random_seed)
-
-        # create Maximizing fitness and Individual
-        # creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        # creator.create("Individual", list, fitness=creator.FitnessMax)
-
-        # Create Maximizing fitness only if it doesn't exist
-        if not hasattr(creator, "FitnessMax"):
-            creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-
-        # Create Individual only if it doesn't exist
-        if not hasattr(creator, "Individual"):
-            creator.create("Individual", list, fitness=creator.FitnessMax)
-
+        # --- TOOLBOX CONFIGURATION ----
         toolbox = base.Toolbox()
 
-        # per-gene attribute generator (captures differing lb/ub per gene)
         def gen_individual():
             return [random.uniform(lb[i], ub[i]) for i in range(len(var_names))]
 
@@ -81,9 +52,7 @@ def run_deap_ga_optimisation(
         )
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-        # ---- fitness function ----
         def fitness_func_individual(individual):
-            # DEAP passes only the individual to the fitness function here
             t_overrides = {
                 var_names[i]: float(individual[i]) for i in range(len(var_names))
             }
@@ -94,129 +63,134 @@ def run_deap_ga_optimisation(
                 sim_result["pc_htf_pump_power"],
                 sim_result["field_htf_pump_power"],
             )
-            # print(type(obj))
-            # print(len(obj))
-            # print(obj.head(10))
-            return (float(obj[0]),)  # DEAP expects a tuple
+            return (float(obj[0]),)
 
         toolbox.register("evaluate", fitness_func_individual)
-
-        # selection, crossover, mutation
         toolbox.register(
-            "select", tools.selTournament, tournsize=CONFIG.get("tournament_size", 3)
+            "select", tools.selTournament, tournsize=CONFIG.get("tournament_size")
         )
         toolbox.register("mate", tools.cxOnePoint)
 
-        # mutation: replace `mutation_num_genes` randomly-chosen genes with uniform samples within bounds
         def mut_random_replace(individual, mutation_num_genes):
             size = len(individual)
-            # pick unique gene indices to mutate
             idxs = random.sample(range(size), min(mutation_num_genes, size))
             for idx in idxs:
                 individual[idx] = random.uniform(lb[idx], ub[idx])
-            # enforce bounds (clamp) just in case
             for i in range(size):
-                if individual[i] < lb[i]:
-                    individual[i] = lb[i]
-                elif individual[i] > ub[i]:
-                    individual[i] = ub[i]
+                individual[i] = max(lb[i], min(ub[i], individual[i]))
             return (individual,)
 
         toolbox.register(
             "mutate",
             mut_random_replace,
-            mutation_num_genes=CONFIG.get("mutation_num_genes", 1),
+            mutation_num_genes=CONFIG.get("mutation_num_genes"),
         )
 
-        # GA configuration - map from CONFIG where possible
-        pop_size = CONFIG["sol_per_pop"]
-        num_generations = CONFIG["num_generations"]
-        cxpb = CONFIG.get("cxpb", 0.5)  # crossover probability per pair
-        mutpb = CONFIG.get(
-            "mutpb", 0.2
-        )  # probability to apply mutation to an offspring
+        # ---- CHECKPOINT / RESUME LOGIC ----
+        checkpoint_dir = Path("checkpoints")
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        config_vars = {
-            "num_generations": num_generations,
-            "pop_size": pop_size,
-            "tournament_size": CONFIG.get("tournament_size", 3),
-            "num_genes": len(var_names),
-            "gene_space": [
-                {"low": lb[i], "high": ub[i]} for i in range(len(var_names))
-            ],
-            "cxpb": cxpb,
-            "mutpb": mutpb,
-            "mutation_num_genes": CONFIG.get("mutation_num_genes", 1),
-            "random_seed": random_seed,
-            "suppress_warnings": CONFIG.get("verbose", False),
-        }
+        # We always resume from 'checkpoint_latest.pkl' if it exists
+        resume_file = checkpoint_dir / "checkpoint_latest.pkl"
 
-        # log config_vars to mlflow (flattened)
-        mlflow.log_params(
-            {
-                k: (v if not isinstance(v, list) else str(v))
-                for k, v in config_vars.items()
-            }
-        )
+        if resume_file.exists() and CONFIG.get("resume_from_checkpoint", False):
+            print(f"--- Resuming from {resume_file} ---")
+            with open(resume_file, "rb") as f:
+                cp = pickle.load(f)
 
-        # initialize population
-        pop = toolbox.population(n=pop_size)
+            pop = cp["pop"]
+            logbook = cp["logbook"]
+            hof = cp["hof"]
+            start_gen = cp["generation"] + 1
+            random.setstate(cp["rndstate"])
+            np.random.set_state(cp["np_rndstate"])
+        else:
+            print("--- Starting fresh optimization ---")
+            if CONFIG.get("random_seed") is not None:
+                random.seed(CONFIG["random_seed"])
+                np.random.seed(CONFIG["random_seed"])
+            pop = toolbox.population(n=pop_size)
+            logbook = tools.Logbook()
+            logbook.header = ["gen", "nevals"] + ["avg", "max"]
+            hof = tools.HallOfFame(maxsize=5)  # Keeps top 5 individuals ever found
+            start_gen = 0
 
-        # optional stats to observe progress
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("avg", np.mean)
-        stats.register("std", np.std)
-        stats.register("min", np.min)
         stats.register("max", np.max)
 
-        # run the evolutionary algorithm
-        # we use eaSimple which applies selection, crossover (cxpb), mutation (mutpb) per generation
-        pop, logbook = algorithms.eaSimple(
-            pop,
-            toolbox,
-            cxpb=cxpb,
-            mutpb=mutpb,
-            ngen=num_generations,
-            stats=stats,
-            verbose=CONFIG.get("verbose", False),
-        )
+        # ---- EVOLUTIONARY LOOP ----
+        if start_gen == 0:
+            invalid_ind = [ind for ind in pop if not ind.fitness.valid]
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            hof.update(pop)
 
-        # find best individual in final population
-        best_ind = tools.selBest(pop, 1)[0]
+        for gen in range(start_gen, num_generations):
+            offspring = algorithms.varAnd(pop, toolbox, cxpb, mutpb)
+
+            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+            fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+
+            pop = toolbox.select(offspring, k=pop_size)
+            hof.update(pop)
+
+            record = stats.compile(pop)
+            logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+            mlflow.log_metrics(
+                {"gen_avg": record["avg"], "gen_max": record["max"]}, step=gen
+            )
+
+            # SAVE NAMED CHECKPOINTS
+            cp_data = {
+                "pop": pop,
+                "logbook": logbook,
+                "hof": hof,
+                "generation": gen,
+                "rndstate": random.getstate(),
+                "np_rndstate": np.random.get_state(),
+            }
+
+            # ---- Save as latest for auto-resume ----
+            with open(resume_file, "wb") as f:
+                pickle.dump(cp_data, f)
+
+            # ---- Save generation-specific for retrieval (e.g., every 10 gens) ----
+            if gen % CONFIG.get("checkpoint_interval", 10) == 0:
+                gen_file = checkpoint_dir / f"checkpoint_gen_{gen}.pkl"
+                with open(gen_file, "wb") as f:
+                    pickle.dump(cp_data, f)
+                mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
+
+        # 6. FINAL RESULTS (Using Hall of Fame)
+        best_ind = hof[0]  # The best ever found, not just best in last pop
         best_solution = list(map(float, best_ind))
         best_fitness = float(best_ind.fitness.values[0])
 
-        # find index of best in final population (closest equivalent to pygad's best_match_idx)
-        try:
-            best_match_idx = next(i for i, ind in enumerate(pop) if ind is best_ind)
-        except StopIteration:
-            best_match_idx = -1
+        x_dict = {
+            f"{name} optimal value": val for name, val in zip(var_names, best_solution)
+        }
+        mlflow.log_metrics({**x_dict, "Best fitness": best_fitness})
 
-        x_dict = {}
-        for var, value in zip(override["overrides"], best_solution):
-            rav = var + " optimal value"
-            x_dict[rav] = float(value)
-
-        mlflow.log_metrics(x_dict)
-        mlflow.log_metrics(
-            {
-                "Best fitness": best_fitness,
-                "Best matching index": best_match_idx,
-            }
-        )
-
-        if CONFIG.get("verbose", True):
-            print("\nBest solution:")
-            for i, name in enumerate(var_names):
-                print(f"  {name}: {best_solution[i]:.6f}")
-            print("Max annual energy:", best_fitness)
-
-        # Build a ga-like instance to return for introspection
-        ga_instance = {
-            "toolbox": toolbox,
-            "population": pop,
-            "logbook": logbook,
-            "stats": stats,
+        # Capture all relevant GA and Problem settings
+        params_to_log = {
+            "pop_size": pop_size,
+            "num_generations": num_generations,
+            "cxpb": cxpb,
+            "mutpb": mutpb,
+            "tournament_size": CONFIG.get("tournament_size", 3),
+            "mutation_num_genes": CONFIG.get("mutation_num_genes", 1),
+            "random_seed": str(CONFIG["random_seed"]),
+            "variable_names": str(var_names),
+            "lower_bounds": str(lb),
+            "upper_bounds": str(ub),
+            "resume_enabled": CONFIG.get("resume_from_checkpoint", False),
         }
 
-        return best_solution, best_fitness, ga_instance
+        # Log everything to MLflow
+        mlflow.log_params(params_to_log)
+
+        return best_solution, best_fitness, {"pop": pop, "logbook": logbook, "hof": hof}

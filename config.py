@@ -17,6 +17,7 @@ CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
     "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
+    "resume_from_checkpoint": False,
     # overrides
     "design": {
         "overrides": [

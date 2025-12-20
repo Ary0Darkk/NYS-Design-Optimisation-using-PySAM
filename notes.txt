@@ -21,7 +21,7 @@ Find out about these variables:
 1. System power generated
 2. PC HTF pump power and why it is always zero?
 3. System net electrical power and why it is negative of field htf pump power?
-4. How to convert MWe to kWh?
+4. How to convert MWe to kWh? -> 1000
 5. What is PPA price multiplier? And difference between retail price and market price?
 
 Now I am thinking how can I perform these two optimisation sequentially.
@@ -30,3 +30,9 @@ I am creating a router file that routes through both kind of optimisation
 
 2025-12-17
 We have built operational and design optimisation logic and also how can we do it sequentially.
+
+2025-12-19
+Now I have built design plus operational optimisation,now I need to implement seasonlity.
+
+2025-12-20
+Today I have implement saving state of optimiser in order to resume it from there again.
