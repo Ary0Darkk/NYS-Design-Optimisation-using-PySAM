@@ -1,10 +1,14 @@
-import matlab.engine
 import mlflow
 import dagshub
 from config import CONFIG
 
 
 def run_ga_optimisation():
+    try:
+        import matlab.engine
+    except ImportError:
+        raise RuntimeError("MATLAB Engine required for GA mode")
+
     # database setup
     mlflow.set_tracking_uri(
         "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"

@@ -1,4 +1,3 @@
-import matlab.engine
 import mlflow
 import dagshub
 import os
@@ -9,6 +8,11 @@ CHECKPOINT_FILE = "fmincon_checkpoint.mat"
 
 
 def run_fmincon_optimisation(resume=False):
+    try:
+        import matlab.engine
+    except ImportError:
+        raise RuntimeError("MATLAB Engine required for fmincon mode")
+
     # database setup
     mlflow.set_tracking_uri(
         "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"

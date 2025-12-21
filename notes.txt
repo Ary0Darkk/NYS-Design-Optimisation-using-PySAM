@@ -36,3 +36,6 @@ Now I have built design plus operational optimisation,now I need to implement se
 
 2025-12-20
 Today I have implement saving state of optimiser in order to resume it from there again.
+
+2025-12-21
+I came to know that you need to import some heavy ones when you need them, means inside function body or during calling them. Imports are not declarative although they run whenever you run your code so to speed up your code, you need to import heavy libraries inside. Like matlab engine imports.
