@@ -39,3 +39,11 @@ Today I have implement saving state of optimiser in order to resume it from ther
 
 2025-12-21
 I came to know that you need to import some heavy ones when you need them, means inside function body or during calling them. Imports are not declarative although they run whenever you run your code so to speed up your code, you need to import heavy libraries inside. Like matlab engine imports.
+
+I need to learn about constraint handling and about maths behind Evolutionary Optimization algorithms.
+I also need to start learning about RL optimisation.
+
+Objective function:
+obj = PC electrical power output(P_cycle)(in MWe)*1_000(in kWh/MWe) * unit price(in Rs/kWh) 
+    - PC HTF Pump Power(cycle_htf_pump_power)(in MWe)*1_000(in kWh/MWe) * unit price(in Rs/kWh) 
+    - Field HTF Pump Power(W_dot_field_pump)(in MWe)*1_000(in kWh/MWe) * unit price(in Rs/kWh)

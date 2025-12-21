@@ -24,7 +24,7 @@ def objective_function(
     field_htf_pump_power_df = pd.Series(
         field_htf_pump_power, name="field_htf_pump_power"
     )
-    print(field_htf_pump_power_df.head())
+    # print(field_htf_pump_power_df.head())
     pc_htf_pump_power_df = pd.Series(pc_htf_pump_power, name="pc_htf_pump_power")
 
     # access final dataset
@@ -38,8 +38,8 @@ def objective_function(
         hourly_energy_df * dynamic_price_df
         - field_htf_pump_power_df * dynamic_price_df
         - pc_htf_pump_power_df * dynamic_price_df
-    )
+    )*1_000
 
     # print(obj.head())
 
-    return obj
+    return -obj
