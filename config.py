@@ -29,9 +29,10 @@ CONFIG = {
             # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "x0": [10, 4, 2, 40, 3],
-        "lb": [5, 2, 1, 20, 1],
-        "ub": [20, 10, 10, 120, 5],
+        "x0": [10, 4, 2, 40],
+        "lb": [5, 2, 1, 20],
+        "ub": [20, 10, 10, 120],
+        "types":[float,int,float,float,],
     },
     "operational": {
         "overrides": [
@@ -44,6 +45,7 @@ CONFIG = {
         "x0": [40, 40],
         "lb": [30, 35],
         "ub": [100, 120],
+        "types":[float,float,int,int]
     },
     # deap-ga optimisation settings
     "random_seed": 21,

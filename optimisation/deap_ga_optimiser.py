@@ -35,6 +35,7 @@ def run_deap_ga_optimisation(
         mlflow.set_tag("Author", CONFIG["author"])
 
         var_names = override["overrides"]
+        var_types = override["types"]
         lb, ub = override["lb"], override["ub"]
         pop_size = CONFIG["sol_per_pop"]
         num_generations = CONFIG["num_generations"]
@@ -53,16 +54,31 @@ def run_deap_ga_optimisation(
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
         def fitness_func_individual(individual):
-            t_overrides = {
-                var_names[i]: float(individual[i]) for i in range(len(var_names))
-            }
+            t_overrides = {}
+            for i in range(len(var_names)):
+                val = individual[i]
+                
+                # Check the type and handle rounding/clamping for integers
+                if var_types[i] is int:
+                    val = round(val)
+                    # FIXME: clamping mechanism implemented
+                    # Use the lb and ub you already extracted outside
+                    val = max(lb[i], min(ub[i], val))
+                
+                # Cast to the correct type (int or float) for the simulation
+                t_overrides[var_names[i]] = var_types[i](val)
+
+            # Combine with static overrides
             final_overrides = {**t_overrides, **static_overrides}
+            
+            # Run the simulation
             sim_result = run_simulation(final_overrides)
             obj = objective_function(
                 sim_result["hourly_energy"],
                 sim_result["pc_htf_pump_power"],
                 sim_result["field_htf_pump_power"],
             )
+            
             return (float(obj[0]),)
 
         toolbox.register("evaluate", fitness_func_individual)
@@ -166,14 +182,37 @@ def run_deap_ga_optimisation(
                 mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
 
         # 6. FINAL RESULTS (Using Hall of Fame)
-        best_ind = hof[0]  # The best ever found, not just best in last pop
-        best_solution = list(map(float, best_ind))
+        best_ind = hof[0]  # The best ever found
+        
+        # We transform the raw GA "genotype" (floats) into your "phenotype" (ints/floats)
+        best_solution = []
+        for i in range(len(var_names)):
+            val = best_ind[i]
+            
+            # Apply rounding and clamping if the type is int
+            if var_types[i] is int:
+                val = round(val)
+                val = max(lb[i], min(ub[i], val))
+            
+            # Cast to the final type (float or int) defined in your config
+            best_solution.append(var_types[i](val))
+
         best_fitness = float(best_ind.fitness.values[0])
 
+        # Use the "reported" version for MLflow and dictionary logging
         x_dict = {
             f"{name} optimal value": val for name, val in zip(var_names, best_solution)
         }
+        
+        # Log the clean, rounded/typed results
         mlflow.log_metrics({**x_dict, "Best fitness": best_fitness})
+
+        # Print the cleaned results for your console
+        if CONFIG.get("verbose", True):
+            print("\nFinal Best Solutions:")
+            for i, name in enumerate(var_names):
+                print(f"  {name}: {best_solution[i]}")
+            print(f"Best fitness value: {best_fitness}")
 
         # Capture all relevant GA and Problem settings
         params_to_log = {

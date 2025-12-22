@@ -47,3 +47,12 @@ Objective function:
 obj = PC electrical power output(P_cycle)(in MWe)*1_000(in kWh/MWe) * unit price(in Rs/kWh) 
     - PC HTF Pump Power(cycle_htf_pump_power)(in MWe)*1_000(in kWh/MWe) * unit price(in Rs/kWh) 
     - Field HTF Pump Power(W_dot_field_pump)(in MWe)*1_000(in kWh/MWe) * unit price(in Rs/kWh)
+
+2025-12-22
+I was correcting the objective function where I have mistakenly put P_out_net in place of P_cycle, and I am gettig objective function to be in thousands in case of net. It seems opposite, and we need to solve this.
+
+And second thing as we are dealing with two parameters that are integers, means 1,2,4 like this. So we need to refactor code in order to fix this. There are two ways to handle this:
+1. Pass integers to Simulation, that is probably the most correct one.
+2. Another way is that as simulation is working with floats too, we can take nearest integer after optimisation.
+
+I think we need to answer this question very carefully!
