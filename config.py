@@ -94,7 +94,7 @@ CONFIG = {
     # Folder where MATLAB file lives
     "matlab_folder": os.path.join(os.path.dirname(__file__), "objective_functions"),
     # Input JSON File (PYSAM default input)
-    "json_file": "simulation/Kanniyan_Project.json",
+    "json_file": "simulation/Gurgaon_plant.json",
     # model we are using from PySAM
     "model": "PhysicalTroughNone",
 }
