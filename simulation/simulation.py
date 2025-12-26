@@ -6,6 +6,7 @@ from utilities.list_nesting import replace_1st_order
 
 from prefect import task
 from prefect.tasks import task_input_hash
+from prefect.logging import get_run_logger
 from datetime import timedelta
 
 
@@ -16,21 +17,24 @@ from datetime import timedelta
     result_storage=CONFIG["storage_block"],
 )
 def run_simulation(overrides):
+    logger = get_run_logger()
     # Convert MATLAB py arguments to Python
     overrides = dict(overrides)
 
     tp = TP.default(CONFIG["model"])
+    logger.info(f"{CONFIG['model']} model loaded!")
 
     # Load JSON
     with open(CONFIG["json_file"], "r") as f:
         data = json.load(f)
+    logger.info(f"{CONFIG['json_file']} file loaded in json format!")
     for k, v in data.items():
         if k != "number_inputs":
             try:
                 tp.value(k, v)
             except Exception:
                 pass
-
+    logger.info("Variables assigned from json file to model!")
     # Apply overrides (changed parameters)
     # overrides = CONFIG["overrides"]
     if overrides:
@@ -57,9 +61,10 @@ def run_simulation(overrides):
             else:
                 print(f"Skipping key {k}: Unknown type {type(current_val)}")
             # print(f'Value after : {tp.value(k)}')
-    # print('Simulation started...')
+    logger.info("Custom overrides of variables performed!")
+    logger.info("Simulation started...")
     tp.execute()
-    # print('Simulation finished!')
+    logger.info("Simulation finished!")
 
     sim_result = {
         "hourly_energy": tp.Outputs.P_out_net,
@@ -67,4 +72,5 @@ def run_simulation(overrides):
         "field_htf_pump_power": tp.Outputs.W_dot_field_pump,
     }
 
+    logger.info("Outputs written to sim_result dict!")
     return sim_result  # dict of outputs

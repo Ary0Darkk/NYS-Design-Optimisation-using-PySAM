@@ -14,6 +14,7 @@ import dagshub
 
 from prefect import task
 from prefect.tasks import task_input_hash
+from prefect.logging import get_run_logger
 from datetime import timedelta
 
 
@@ -24,6 +25,8 @@ from datetime import timedelta
     result_storage=CONFIG["storage_block"],
 )
 def optimisation_mode() -> str | dict[str, list[float]]:
+    logger = get_run_logger()
+
     override = None
     if CONFIG["route"] == "design":
         override = CONFIG["design"]
@@ -33,6 +36,8 @@ def optimisation_mode() -> str | dict[str, list[float]]:
         override = "design_operational"
     else:
         print(f"{CONFIG['route']} : Not found! ")
+
+    logger.debug(f"{override} route taken!")
 
     return override
 
@@ -50,6 +55,8 @@ def call_optimiser(
 ):
     # FIXME : try and catch is not working as expected,
     # look at keyboard interupt working
+    logger = get_run_logger()
+
     if static_overrides is None:
         static_overrides = {}
 
@@ -79,12 +86,15 @@ def call_optimiser(
             )
         else:
             print(f"{opt_type} : Not a valid optimiser name in CONFIG")
+
+        logger.debug(f"{opt_type} started!")
         # only print if the variables were successfully set
         if x_opt is not None:
-            print(f"x_opt : {x_opt} \nf_val : {f_val}")
+            logger.info(f"x_opt : {x_opt}")
+            logger.info(f"f_val : {f_val}")
 
     except KeyboardInterrupt:
-        print("\n\nOptimization interrupted by user. Stopping...\n")
+        logger.warning("\n\nOptimization interrupted by user. Stopping...\n")
     # except Exception as e:
     #     print("Unexpected error :", e)
 
@@ -98,6 +108,7 @@ def call_optimiser(
     result_storage=CONFIG["storage_block"],
 )
 def run_router():
+    logger = get_run_logger()
     # database setup
     mlflow.set_tracking_uri(
         "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
@@ -121,26 +132,26 @@ def run_router():
 
     # only perfoms single optim
     if override != "design_operational":
-        print(f"{CONFIG['route']} optimisation started !")
-        print(f"Optimisation of : {override}")
+        logger.debug(f"{CONFIG['route']} optimisation started !")
+        # print(f"Optimisation of : {override}")
         call_optimiser(override, is_nested=False)
     # perform both optim in sequence
     else:
         is_nested = True  # informs mlflow for multi-step run
         # 1. Start a Parent Run to group everything
         with mlflow.start_run(run_name="Sequential des-operational"):
-            print(
+            logger.debug(
                 "Going to begin Design plus Operational optimisation sequentially!\n\n"
             )
-            print(f"Design optimisation started !")
-            print(f"Optimisation of : {override}")
+            logger.debug(f"Design optimisation started !")
+            # print(f"Optimisation of : {override}")
             optimals = call_optimiser(override=CONFIG["design"], is_nested=is_nested)
 
             if optimals is not None:
                 design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
 
-                print(f"Operational optimisation started !")
-                print(f"Optimisation of : {override}")
+                logger.debug(f"Operational optimisation started !")
+                # print(f"Optimisation of : {override}")
                 call_optimiser(
                     override=CONFIG["operational"],
                     static_overrides=design_dict,
@@ -148,4 +159,4 @@ def run_router():
                 )
 
             else:
-                print("Design optimisation is not performed yet!")
+                logger.warning("Design optimisation is not performed yet!")

@@ -4,7 +4,8 @@ import argparse
 import glob
 import os
 
-from prefect import flow, task
+from prefect import flow
+from prefect.logging import get_run_logger
 
 
 def load_repro_config(path):
@@ -33,7 +34,10 @@ def find_latest_downloaded_config():
 
 @flow(name="DEAP-GA Optimisation")
 def main(force_update: bool = False):
+    logger = get_run_logger()
+
     if force_update:
+        logger.debug("Running optimisation with forced-update!")
         # runs router
         run_router.with_options(refresh_cache=True)()
     else:

@@ -3,11 +3,13 @@ import numpy as np
 import mlflow
 import pickle
 import sys
+import json
 from pathlib import Path
 from deap import base, creator, tools, algorithms
 
 from prefect import task
 from prefect.tasks import task_input_hash
+from prefect.logging import get_run_logger
 from datetime import timedelta
 
 # Setup path to internal modules
@@ -29,6 +31,7 @@ from objective_functions.objective_func import objective_function
 def run_deap_ga_optimisation(
     override, static_overrides: dict[str, float], is_nested: bool
 ):
+    logger = get_run_logger()
     # ---- SETUP DEAP GLOBALS ----
     if not hasattr(creator, "FitnessMax"):
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -45,12 +48,20 @@ def run_deap_ga_optimisation(
         mlflow.set_tag("Author", CONFIG["author"])
 
         var_names = override["overrides"]
+        logger.info(f"Override variables : {var_names}")
         var_types = override["types"]
+        logger.info(f"Data-Type of variables : {var_types}")
         lb, ub = override["lb"], override["ub"]
+        logger.info(f"Lower bound : {lb}")
+        logger.info(f"Upper bound : {ub}")
         pop_size = CONFIG["sol_per_pop"]
+        logger.info(f"Population size : {pop_size}")
         num_generations = CONFIG["num_generations"]
+        logger.info(f"Num of gen : {num_generations}")
         cxpb = CONFIG.get("cxpb", 0.5)
+        logger.info(f"cxpb value : {cxpb}")
         mutpb = CONFIG.get("mutpb", 0.2)
+        logger.info(f"mutpb value : {mutpb}")
 
         # --- TOOLBOX CONFIGURATION ----
         toolbox = base.Toolbox()
@@ -242,6 +253,9 @@ def run_deap_ga_optimisation(
             "upper_bounds": str(ub),
             "resume_enabled": CONFIG.get("resume_from_checkpoint", False),
         }
+
+        params_dict = json.dumps(params_to_log, indent=4)
+        logger.info(f"Optimization Results:\n{params_dict}")
 
         # Log everything to MLflow
         mlflow.log_params(params_to_log)

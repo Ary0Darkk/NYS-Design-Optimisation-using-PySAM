@@ -18,7 +18,7 @@ CONFIG = {
     "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
-    "force_update": True,
+    "force_update": False,
     "storage_block": "local-file-system/local-storage",
     # overrides
     "design": {
@@ -31,9 +31,9 @@ CONFIG = {
             # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "x0": [10, 4, 2, 40],
-        "lb": [5, 2, 1, 20],
-        "ub": [20, 10, 10, 125],
+        "x0": [10, 4, 2, 45],
+        "lb": [5, 2, 1, 30],
+        "ub": [20, 10, 10, 140],
         "types": [
             float,
             int,
