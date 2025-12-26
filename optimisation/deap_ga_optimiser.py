@@ -19,8 +19,9 @@ from config import CONFIG
 from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
 
+
 @task(
-    cache_key_fn=task_input_hash, 
+    cache_key_fn=task_input_hash,
     persist_result=True,
     cache_expiration=timedelta(days=1),
     result_storage=CONFIG["storage_block"],
@@ -66,20 +67,20 @@ def run_deap_ga_optimisation(
             t_overrides = {}
             for i in range(len(var_names)):
                 val = individual[i]
-                
+
                 # Check the type and handle rounding/clamping for integers
                 if var_types[i] is int:
                     val = round(val)
                     # FIXME: clamping mechanism implemented
                     # Use the lb and ub you already extracted outside
                     val = max(lb[i], min(ub[i], val))
-                
+
                 # Cast to the correct type (int or float) for the simulation
                 t_overrides[var_names[i]] = var_types[i](val)
 
             # Combine with static overrides
             final_overrides = {**t_overrides, **static_overrides}
-            
+
             # Run the simulation
             sim_result = run_simulation(final_overrides)
             obj = objective_function(
@@ -87,7 +88,7 @@ def run_deap_ga_optimisation(
                 sim_result["pc_htf_pump_power"],
                 sim_result["field_htf_pump_power"],
             )
-            
+
             return (float(obj[0]),)
 
         toolbox.register("evaluate", fitness_func_individual)
@@ -192,17 +193,17 @@ def run_deap_ga_optimisation(
 
         # 6. FINAL RESULTS (Using Hall of Fame)
         best_ind = hof[0]  # The best ever found
-        
+
         # We transform the raw GA "genotype" (floats) into your "phenotype" (ints/floats)
         best_solution = []
         for i in range(len(var_names)):
             val = best_ind[i]
-            
+
             # Apply rounding and clamping if the type is int
             if var_types[i] is int:
                 val = round(val)
                 val = max(lb[i], min(ub[i], val))
-            
+
             # Cast to the final type (float or int) defined in your config
             best_solution.append(var_types[i](val))
 
@@ -212,20 +213,20 @@ def run_deap_ga_optimisation(
         x_dict = {
             f"{name} optimal value": val for name, val in zip(var_names, best_solution)
         }
-        
+
         # Log the clean, rounded/typed results
         mlflow.log_metrics({**x_dict, "Best fitness": best_fitness})
 
         # Print the cleaned results for your console
         if CONFIG.get("verbose", True):
-            print("\n" + "-"*35)
+            print("\n" + "-" * 35)
             print("Final Best Solutions:")
-            print("-"*35)
+            print("-" * 35)
             for i, name in enumerate(var_names):
                 print(f"  {name:20}: {best_solution[i]:.4f}")
-            print("-"*35)
+            print("-" * 35)
             print(f"{'Best Fitness':15}: {best_fitness:.4f}")
-            print("-"*35)
+            print("-" * 35)
 
         # Capture all relevant GA and Problem settings
         params_to_log = {

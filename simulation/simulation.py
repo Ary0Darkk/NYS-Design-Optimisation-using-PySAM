@@ -10,7 +10,7 @@ from datetime import timedelta
 
 
 @task(
-    cache_key_fn=task_input_hash, 
+    cache_key_fn=task_input_hash,
     persist_result=True,
     cache_expiration=timedelta(days=1),
     result_storage=CONFIG["storage_block"],

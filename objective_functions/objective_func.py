@@ -9,7 +9,7 @@ from config import CONFIG
 
 # TODO : write correct code for this func
 @task(
-    cache_key_fn=task_input_hash, 
+    cache_key_fn=task_input_hash,
     persist_result=True,
     cache_expiration=timedelta(days=1),
     result_storage=CONFIG["storage_block"],
@@ -49,7 +49,7 @@ def objective_function(
         hourly_energy_df * dynamic_price_df
         - field_htf_pump_power_df * dynamic_price_df
         - pc_htf_pump_power_df * dynamic_price_df
-    )*1_000
+    ) * 1_000
 
     # print(obj.head())
 

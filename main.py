@@ -30,10 +30,14 @@ def find_latest_downloaded_config():
         )
     return files[0]
 
+
 @flow(name="DEAP-GA Optimisation")
-def main():
-    # runs router
-    run_router()
+def main(force_update: bool = False):
+    if force_update:
+        # runs router
+        run_router.with_options(refresh_cache=True)()
+    else:
+        run_router()
 
 
 if __name__ == "__main__":
@@ -63,4 +67,4 @@ if __name__ == "__main__":
         CONFIG.update(repro_cfg if "CONFIG" not in repro_cfg else repro_cfg["CONFIG"])
 
     # proceed with normal run using modified CONFIG
-    main()
+    main(CONFIG["force_update"])

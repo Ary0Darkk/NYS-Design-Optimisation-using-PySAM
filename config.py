@@ -18,7 +18,8 @@ CONFIG = {
     "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
-    "storage_block" : "local-file-system/local-storage",
+    "force_update": True,
+    "storage_block": "local-file-system/local-storage",
     # overrides
     "design": {
         "overrides": [
@@ -33,7 +34,12 @@ CONFIG = {
         "x0": [10, 4, 2, 40],
         "lb": [5, 2, 1, 20],
         "ub": [20, 10, 10, 125],
-        "types":[float,int,float,float,],
+        "types": [
+            float,
+            int,
+            float,
+            float,
+        ],
     },
     "operational": {
         "overrides": [
@@ -46,7 +52,7 @@ CONFIG = {
         "x0": [40, 40],
         "lb": [30, 35],
         "ub": [100, 135],
-        "types":[float,float,int,int]
+        "types": [float, float, int, int],
     },
     # deap-ga optimisation settings
     "random_seed": 21,
