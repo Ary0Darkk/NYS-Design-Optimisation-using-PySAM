@@ -12,7 +12,16 @@ from config import CONFIG
 import mlflow
 import dagshub
 
+from prefect import task
+from prefect.tasks import task_input_hash
+from datetime import timedelta
 
+@task(
+    cache_key_fn=task_input_hash, 
+    persist_result=True,
+    cache_expiration=timedelta(days=1),
+    result_storage=CONFIG["storage_block"],
+)
 def optimisation_mode() -> str | dict[str, list[float]]:
     override = None
     if CONFIG["route"] == "design":
@@ -26,7 +35,12 @@ def optimisation_mode() -> str | dict[str, list[float]]:
 
     return override
 
-
+@task(
+    cache_key_fn=task_input_hash, 
+    persist_result=True,
+    cache_expiration=timedelta(days=1),
+    result_storage=CONFIG["storage_block"],
+)
 def call_optimiser(
     override: dict[str, list[float]],
     is_nested: bool,
@@ -74,7 +88,12 @@ def call_optimiser(
 
     return x_opt, f_val
 
-
+@task(
+    cache_key_fn=task_input_hash, 
+    persist_result=True,
+    cache_expiration=timedelta(days=1),
+    result_storage=CONFIG["storage_block"],
+)
 def run_router():
     # database setup
     mlflow.set_tracking_uri(

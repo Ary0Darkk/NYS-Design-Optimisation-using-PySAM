@@ -4,6 +4,8 @@ import argparse
 import glob
 import os
 
+from prefect import flow, task
+
 
 def load_repro_config(path):
     """Load config (config.py-style dict)"""
@@ -28,7 +30,7 @@ def find_latest_downloaded_config():
         )
     return files[0]
 
-
+@flow(name="DEAP-GA Optimisation")
 def main():
     # runs router
     run_router()

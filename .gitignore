@@ -11,3 +11,9 @@ optimisation/__pycache__
 
 # mlflow local runs
 mlruns
+
+# prefect cache
+.prefect_cache
+
+# checkpoints cache
+checkpoints

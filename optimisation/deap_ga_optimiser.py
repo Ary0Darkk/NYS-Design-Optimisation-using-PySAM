@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 from deap import base, creator, tools, algorithms
 
+from prefect import task
+from prefect.tasks import task_input_hash
+from datetime import timedelta
+
 # Setup path to internal modules
 root_path = str(Path(__file__).resolve().parent.parent)
 if root_path not in sys.path:
@@ -15,7 +19,12 @@ from config import CONFIG
 from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
 
-
+@task(
+    cache_key_fn=task_input_hash, 
+    persist_result=True,
+    cache_expiration=timedelta(days=1),
+    result_storage=CONFIG["storage_block"],
+)
 def run_deap_ga_optimisation(
     override, static_overrides: dict[str, float], is_nested: bool
 ):
@@ -209,10 +218,14 @@ def run_deap_ga_optimisation(
 
         # Print the cleaned results for your console
         if CONFIG.get("verbose", True):
-            print("\nFinal Best Solutions:")
+            print("\n" + "-"*35)
+            print("Final Best Solutions:")
+            print("-"*35)
             for i, name in enumerate(var_names):
-                print(f"  {name}: {best_solution[i]}")
-            print(f"Best fitness value: {best_fitness}")
+                print(f"  {name:20}: {best_solution[i]:.4f}")
+            print("-"*35)
+            print(f"{'Best Fitness':15}: {best_fitness:.4f}")
+            print("-"*35)
 
         # Capture all relevant GA and Problem settings
         params_to_log = {

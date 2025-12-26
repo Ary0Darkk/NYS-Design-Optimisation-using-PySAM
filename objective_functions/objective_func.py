@@ -1,8 +1,19 @@
 import pandas as pd
 from demand_data import get_dynamic_price
+from prefect import task
+from prefect.tasks import task_input_hash
+from datetime import timedelta
+
+from config import CONFIG
 
 
 # TODO : write correct code for this func
+@task(
+    cache_key_fn=task_input_hash, 
+    persist_result=True,
+    cache_expiration=timedelta(days=1),
+    result_storage=CONFIG["storage_block"],
+)
 def objective_function(
     hourly_energy: list[float],
     field_htf_pump_power: list[float],

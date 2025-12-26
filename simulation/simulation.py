@@ -4,7 +4,17 @@ import PySAM.TroughPhysical as TP
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
 
+from prefect import task
+from prefect.tasks import task_input_hash
+from datetime import timedelta
 
+
+@task(
+    cache_key_fn=task_input_hash, 
+    persist_result=True,
+    cache_expiration=timedelta(days=1),
+    result_storage=CONFIG["storage_block"],
+)
 def run_simulation(overrides):
     # Convert MATLAB py arguments to Python
     overrides = dict(overrides)
