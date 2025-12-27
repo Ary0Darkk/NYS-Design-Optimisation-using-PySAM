@@ -23,10 +23,6 @@ from objective_functions.objective_func import objective_function
 
 
 @task(
-    cache_key_fn=task_input_hash,
-    persist_result=True,
-    cache_expiration=timedelta(days=1),
-    result_storage=CONFIG["storage_block"],
 )
 def run_deap_ga_optimisation(
     override, static_overrides: dict[str, float], is_nested: bool

@@ -31,7 +31,7 @@ CONFIG = {
             # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "x0": [10, 4, 2, 45],
+        "x0": [10, 4, 3, 50],
         "lb": [5, 2, 1, 30],
         "ub": [20, 10, 10, 140],
         "types": [
@@ -39,6 +39,7 @@ CONFIG = {
             int,
             float,
             float,
+            int,
         ],
     },
     "operational": {

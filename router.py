@@ -19,10 +19,7 @@ from datetime import timedelta
 
 
 @task(
-    cache_key_fn=task_input_hash,
-    persist_result=True,
-    cache_expiration=timedelta(days=1),
-    result_storage=CONFIG["storage_block"],
+   
 )
 def optimisation_mode() -> str | dict[str, list[float]]:
     logger = get_run_logger()
@@ -43,10 +40,6 @@ def optimisation_mode() -> str | dict[str, list[float]]:
 
 
 @task(
-    cache_key_fn=task_input_hash,
-    persist_result=True,
-    cache_expiration=timedelta(days=1),
-    result_storage=CONFIG["storage_block"],
 )
 def call_optimiser(
     override: dict[str, list[float]],
@@ -102,10 +95,6 @@ def call_optimiser(
 
 
 @task(
-    cache_key_fn=task_input_hash,
-    persist_result=True,
-    cache_expiration=timedelta(days=1),
-    result_storage=CONFIG["storage_block"],
 )
 def run_router():
     logger = get_run_logger()
