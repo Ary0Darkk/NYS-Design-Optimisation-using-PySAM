@@ -18,9 +18,7 @@ from prefect.logging import get_run_logger
 from datetime import timedelta
 
 
-@task(
-   
-)
+@task()
 def optimisation_mode() -> str | dict[str, list[float]]:
     logger = get_run_logger()
 
@@ -39,8 +37,7 @@ def optimisation_mode() -> str | dict[str, list[float]]:
     return override
 
 
-@task(
-)
+@task()
 def call_optimiser(
     override: dict[str, list[float]],
     is_nested: bool,
@@ -94,8 +91,7 @@ def call_optimiser(
     return x_opt, f_val
 
 
-@task(
-)
+@task()
 def run_router():
     logger = get_run_logger()
     # database setup

@@ -39,7 +39,6 @@ CONFIG = {
             int,
             float,
             float,
-            int,
         ],
     },
     "operational": {
@@ -57,11 +56,11 @@ CONFIG = {
     },
     # deap-ga optimisation settings
     "random_seed": 21,
-    "tournament_size": 3,
+    "tournament_size": 10,
     "mutation_num_genes": 1,
-    "sol_per_pop": 3,
+    "sol_per_pop": 100,
     "num_generations": 2,
-    "cxpb": 0.5,
+    "cxpb": 0.8,
     "mutpb": 0.2,
     "verbose": True,
     # nlopt-fmincon settings

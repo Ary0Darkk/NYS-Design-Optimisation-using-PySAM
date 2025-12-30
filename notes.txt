@@ -56,3 +56,8 @@ And second thing as we are dealing with two parameters that are integers, means 
 2. Another way is that as simulation is working with floats too, we can take nearest integer after optimisation.
 
 I think we need to answer this question very carefully!
+
+2025-12-30
+I need to carefully reimplement deap library and I have to handle integer and float variables carefully.
+And I have to build RL optimiser using sb3 and gymanasium, currently I have template for that from gemini.
+I also have to look for crashing of program and checkpointing to handle it. And possibly look for how prefect handles caching because i have seen that even when I am running again program with same configs, caching is not dealt correctly.One possible reason is random seeding.

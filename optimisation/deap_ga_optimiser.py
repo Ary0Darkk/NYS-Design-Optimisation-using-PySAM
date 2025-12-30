@@ -8,9 +8,7 @@ from pathlib import Path
 from deap import base, creator, tools, algorithms
 
 from prefect import task
-from prefect.tasks import task_input_hash
 from prefect.logging import get_run_logger
-from datetime import timedelta
 
 # Setup path to internal modules
 root_path = str(Path(__file__).resolve().parent.parent)
@@ -22,8 +20,7 @@ from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
 
 
-@task(
-)
+@task()
 def run_deap_ga_optimisation(
     override, static_overrides: dict[str, float], is_nested: bool
 ):
@@ -62,6 +59,7 @@ def run_deap_ga_optimisation(
         # --- TOOLBOX CONFIGURATION ----
         toolbox = base.Toolbox()
 
+        # generates individual
         def gen_individual():
             return [random.uniform(lb[i], ub[i]) for i in range(len(var_names))]
 

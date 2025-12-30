@@ -53,4 +53,4 @@ def objective_function(
 
     # print(obj.head())
 
-    return -obj
+    return obj
