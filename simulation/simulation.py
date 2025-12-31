@@ -1,24 +1,45 @@
 import json
 import PySAM.TroughPhysical as TP
+import hashlib
 
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
 
 from prefect import task
-from prefect.tasks import task_input_hash
 from prefect.logging import get_run_logger
 from datetime import timedelta
 
 
+def canonicalize_overrides(overrides):
+    return tuple(
+        sorted(
+            (
+                k,
+                int(v)
+                if isinstance(v, bool) or float(v).is_integer()
+                else round(float(v), 6),
+            )
+            for k, v in overrides.items()
+        )
+    )
+
+
+def simulation_cache_key(context, parameters):
+    canon = canonicalize_overrides(parameters["overrides"])
+    digest = hashlib.sha256(repr(canon).encode()).hexdigest()
+    return f"sim_{digest}"
+
+
 @task(
-    cache_key_fn=task_input_hash,
+    cache_key_fn=simulation_cache_key,
     persist_result=True,
+    refresh_cache=False,
     cache_expiration=timedelta(days=1),
     result_storage=CONFIG["storage_block"],
 )
 def run_simulation(overrides):
     logger = get_run_logger()
-    # Convert MATLAB py arguments to Python
+
     overrides = dict(overrides)
 
     tp = TP.default(CONFIG["model"])
@@ -27,16 +48,25 @@ def run_simulation(overrides):
     # Load JSON
     with open(CONFIG["json_file"], "r") as f:
         data = json.load(f)
-    logger.info(f"{CONFIG['json_file']} file loaded in json format!")
+    logger.info(f"{CONFIG['json_file']} file loaded!")
+
+    # assign(dict) -> None : takes dict and copies the values into the PySAM model
+    # export() -> dict : pulls every single parameter currently set in that
+    # PySAM module and puts them into a standard Python dictionary
+    # replace(dict) -> None : If your dictionary only has 5 variables,
+    # PySAM will "unassign" or clear all other variables in that module that are not in your dictionary.
+    # NOTE : can't use assign here, because we are assigning
+    # variables of different sub-modules
     for k, v in data.items():
         if k != "number_inputs":
             try:
                 tp.value(k, v)
             except Exception:
                 pass
+
     logger.info("Variables assigned from json file to model!")
+
     # Apply overrides (changed parameters)
-    # overrides = CONFIG["overrides"]
     if overrides:
         for k, v in overrides.items():
             # print(f'Value before : {tp.value(k)}')

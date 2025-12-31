@@ -1,13 +1,15 @@
 # setup_cache.py
 from prefect.filesystems import LocalFileSystem
+from pathlib import Path
 
-# Use a relative path so it works across different PC usernames
-# This will create a '.prefect_cache' folder in your project
-sub_folder = ".prefect_cache"
+# Google Drive base path (Google Drive Desktop must be installed)
+GDRIVE_BASE = Path.home() / "My Drive (1)"
 
-block = LocalFileSystem(basepath=sub_folder)
-block.save("local-storage", overwrite=True)
+# Prefect cache directory inside Drive
+cache_dir = GDRIVE_BASE / "prefect_cache"
+cache_dir.mkdir(parents=True, exist_ok=True)
 
-print(
-    f"✅ Success: Block 'local-storage' registered. Results will save to {sub_folder}"
-)
+block = LocalFileSystem(basepath=str(cache_dir))
+block.save("gdrive-storage", overwrite=True)
+
+print(f"Success: Block 'gdrive-storage' registered. Results will save to {cache_dir}")

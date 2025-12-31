@@ -25,11 +25,6 @@ def run_deap_ga_optimisation(
     override, static_overrides: dict[str, float], is_nested: bool
 ):
     logger = get_run_logger()
-    # ---- SETUP DEAP GLOBALS ----
-    if not hasattr(creator, "FitnessMax"):
-        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-    if not hasattr(creator, "Individual"):
-        creator.create("Individual", list, fitness=creator.FitnessMax)
 
     # ---- MLFLOW SETUP ----
     if mlflow.active_run() and not is_nested:
@@ -39,6 +34,9 @@ def run_deap_ga_optimisation(
 
     with mlflow.start_run(run_name=run_name, nested=is_nested):
         mlflow.set_tag("Author", CONFIG["author"])
+
+        # logs config file
+        mlflow.log_artifact("config.py")
 
         var_names = override["overrides"]
         logger.info(f"Override variables : {var_names}")
@@ -55,6 +53,12 @@ def run_deap_ga_optimisation(
         logger.info(f"cxpb value : {cxpb}")
         mutpb = CONFIG.get("mutpb", 0.2)
         logger.info(f"mutpb value : {mutpb}")
+
+        # ---- SETUP DEAP GLOBALS ----
+        if not hasattr(creator, "FitnessMax"):
+            creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+        if not hasattr(creator, "Individual"):
+            creator.create("Individual", list, fitness=creator.FitnessMax)
 
         # --- TOOLBOX CONFIGURATION ----
         toolbox = base.Toolbox()
@@ -73,14 +77,6 @@ def run_deap_ga_optimisation(
             for i in range(len(var_names)):
                 val = individual[i]
 
-                # Check the type and handle rounding/clamping for integers
-                if var_types[i] is int:
-                    val = round(val)
-                    # FIXME: clamping mechanism implemented
-                    # Use the lb and ub you already extracted outside
-                    val = max(lb[i], min(ub[i], val))
-
-                # Cast to the correct type (int or float) for the simulation
                 t_overrides[var_names[i]] = var_types[i](val)
 
             # Combine with static overrides
@@ -102,23 +98,36 @@ def run_deap_ga_optimisation(
         )
         toolbox.register("mate", tools.cxOnePoint)
 
-        def mut_random_replace(individual, mutation_num_genes):
-            size = len(individual)
-            idxs = random.sample(range(size), min(mutation_num_genes, size))
-            for idx in idxs:
-                individual[idx] = random.uniform(lb[idx], ub[idx])
-            for i in range(size):
-                individual[i] = max(lb[i], min(ub[i], individual[i]))
+        def custom_mutation(individual, indpb, var_types, low, up):
+            for i in range(len(individual)):
+                if random.random() < indpb:
+                    if var_types[i] == int:
+                        # Integer Mutation: Uniform choice within bounds
+                        individual[i] = random.randint(low[i], up[i])
+                    else:
+                        # Float Mutation: Gaussian shift
+                        # Sigma is 10% of the range
+                        sigma = (up[i] - low[i]) * 0.1
+                        individual[i] += random.gauss(0, sigma)
+
+                    # Boundary Enforcement (Crucial for MATLAB-style consistency)
+                    individual[i] = max(low[i], min(up[i], individual[i]))
+
             return (individual,)
 
+        # Register using 'partial' logic (passing the types and bounds once)
         toolbox.register(
             "mutate",
-            mut_random_replace,
-            mutation_num_genes=CONFIG.get("mutation_num_genes"),
+            custom_mutation,
+            indpb=CONFIG.get("indpb"),
+            var_types=var_types,
+            low=lb,
+            up=ub,
         )
 
         # ---- CHECKPOINT / RESUME LOGIC ----
-        checkpoint_dir = Path("checkpoints")
+        run_id = mlflow.active_run().info.run_id
+        checkpoint_dir = Path.home() / "My Drive" / "ga_checkpoints" / run_id
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         # We always resume from 'checkpoint_latest.pkl' if it exists
@@ -190,7 +199,7 @@ def run_deap_ga_optimisation(
                 pickle.dump(cp_data, f)
 
             # ---- Save generation-specific for retrieval (e.g., every 10 gens) ----
-            if gen % CONFIG.get("checkpoint_interval", 10) == 0:
+            if gen % CONFIG.get("checkpoint_interval", 2) == 0:
                 gen_file = checkpoint_dir / f"checkpoint_gen_{gen}.pkl"
                 with open(gen_file, "wb") as f:
                     pickle.dump(cp_data, f)

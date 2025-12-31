@@ -17,9 +17,9 @@ CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
     "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
-    "resume_from_checkpoint": False,
+    "resume_from_checkpoint": True,
     "force_update": False,
-    "storage_block": "local-file-system/local-storage",
+    "storage_block": "local-file-system/gdrive-storage",
     # overrides
     "design": {
         "overrides": [
@@ -52,16 +52,17 @@ CONFIG = {
         "x0": [40, 40],
         "lb": [30, 35],
         "ub": [100, 135],
-        "types": [float, float, int, int],
+        "types": [float, float],
     },
     # deap-ga optimisation settings
     "random_seed": 21,
-    "tournament_size": 10,
-    "mutation_num_genes": 1,
-    "sol_per_pop": 100,
-    "num_generations": 2,
+    "tournament_size": 2,
+    "mutation_num_genes": 5,
+    "sol_per_pop": 4,
+    "num_generations": 5,
     "cxpb": 0.8,
     "mutpb": 0.2,
+    "indpb": 0.2,
     "verbose": True,
     # nlopt-fmincon settings
     "nlopt_algorithm": "LD_SLSQP",

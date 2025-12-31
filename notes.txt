@@ -61,3 +61,10 @@ I think we need to answer this question very carefully!
 I need to carefully reimplement deap library and I have to handle integer and float variables carefully.
 And I have to build RL optimiser using sb3 and gymanasium, currently I have template for that from gemini.
 I also have to look for crashing of program and checkpointing to handle it. And possibly look for how prefect handles caching because i have seen that even when I am running again program with same configs, caching is not dealt correctly.One possible reason is random seeding.
+
+2025-12-31
+assign : takes dict and copies the values into the PySAM model
+NOTE : can't use assign here, because we are assigning variables of different sub-modules
+So we can't further optimise assigning variables in simulation
+
+Now, I am working on caching simulation to save time. I found out that using dict can't help me.So I have canonicalise it and use tuple. Even use or custom hashing function.
