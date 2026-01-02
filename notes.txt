@@ -68,3 +68,5 @@ NOTE : can't use assign here, because we are assigning variables of different su
 So we can't further optimise assigning variables in simulation
 
 Now, I am working on caching simulation to save time. I found out that using dict can't help me.So I have canonicalise it and use tuple. Even use or custom hashing function.
+
+Now, I am caching my data to gdrive but only caching is working, I need to make checkpointing work too.

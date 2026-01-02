@@ -20,6 +20,7 @@ CONFIG = {
     "resume_from_checkpoint": True,
     "force_update": False,
     "storage_block": "local-file-system/gdrive-storage",
+    "num_cores":8,
     # overrides
     "design": {
         "overrides": [
@@ -32,7 +33,7 @@ CONFIG = {
         ],
         # Bounds
         "x0": [10, 4, 3, 50],
-        "lb": [5, 2, 1, 30],
+        "lb": [5, 2, 1, 40],
         "ub": [20, 10, 10, 140],
         "types": [
             float,
@@ -50,7 +51,7 @@ CONFIG = {
         ],
         # Bounds
         "x0": [40, 40],
-        "lb": [30, 35],
+        "lb": [30, 30],
         "ub": [100, 135],
         "types": [float, float],
     },
@@ -59,7 +60,7 @@ CONFIG = {
     "tournament_size": 2,
     "mutation_num_genes": 5,
     "sol_per_pop": 4,
-    "num_generations": 5,
+    "num_generations": 8,
     "cxpb": 0.8,
     "mutpb": 0.2,
     "indpb": 0.2,
