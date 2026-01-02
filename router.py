@@ -41,6 +41,7 @@ def optimisation_mode() -> str | dict[str, list[float]]:
 def call_optimiser(
     override: dict[str, list[float]],
     is_nested: bool,
+    target_hour:int,
     static_overrides: Optional[dict[str, float]] = None,
 ):
     # FIXME : try and catch is not working as expected,
@@ -69,10 +70,11 @@ def call_optimiser(
         elif opt_type == "scipy_min":
             x_opt, f_val, _ = run_scipy_minimise()
         elif opt_type == "deap_ga":
-            x_opt, f_val, _ = run_deap_ga_optimisation(
+            x_opt, f_val, o_metrices = run_deap_ga_optimisation(
                 override=override,
                 static_overrides=static_overrides,
                 is_nested=is_nested,
+                curr_hour = target_hour
             )
         else:
             print(f"{opt_type} : Not a valid optimiser name in CONFIG")
@@ -88,7 +90,33 @@ def call_optimiser(
     # except Exception as e:
     #     print("Unexpected error :", e)
 
-    return x_opt, f_val
+    return x_opt, f_val,o_metrices
+
+
+@task()
+def run_hourly_optimisation(override: dict[str, list[float]],
+    is_nested: bool,
+    static_overrides: Optional[dict[str, float]] = None,):
+    results = {}
+
+    for hour in range(8760):
+        print(f"\n{'-'*20}")
+        print(f"Optimising for hour {hour}")
+        print(f"{'-'*20}")
+
+        best_x, best_f, o_metrices = call_optimiser(
+            override=override,
+            static_overrides=static_overrides,
+            is_nested=is_nested,
+            target_hour=hour
+        )
+
+        results[hour] = {
+            "best_solution": best_x,
+            "best_fitness": best_f,
+        }
+
+    return results
 
 
 @task()
@@ -119,7 +147,7 @@ def run_router():
     if override != "design_operational":
         logger.debug(f"{CONFIG['route']} optimisation started !")
         # print(f"Optimisation of : {override}")
-        call_optimiser(override, is_nested=False)
+        run_hourly_optimisation(override, is_nested=False)
     # perform both optim in sequence
     else:
         is_nested = True  # informs mlflow for multi-step run
@@ -130,14 +158,14 @@ def run_router():
             )
             logger.debug(f"Design optimisation started !")
             # print(f"Optimisation of : {override}")
-            optimals = call_optimiser(override=CONFIG["design"], is_nested=is_nested)
+            optimals = run_hourly_optimisation(override=CONFIG["design"], is_nested=is_nested)
 
             if optimals is not None:
                 design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
 
                 logger.debug(f"Operational optimisation started !")
                 # print(f"Optimisation of : {override}")
-                call_optimiser(
+                run_hourly_optimisation(
                     override=CONFIG["operational"],
                     static_overrides=design_dict,
                     is_nested=is_nested,

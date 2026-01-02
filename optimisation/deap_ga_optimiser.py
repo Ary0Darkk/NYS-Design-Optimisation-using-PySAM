@@ -6,6 +6,7 @@ import hashlib
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 import pickle
+from functools import partial
 
 from deap import base, creator, tools, algorithms
 from prefect import task
@@ -46,7 +47,8 @@ def init_worker(
 # ============================================================
 # FITNESS FUNCTION (MUST BE TOP-LEVEL)
 # ============================================================
-def deap_fitness(individual):
+def deap_fitness(individual,hour):
+
     overrides_dyn = {
         _GA_VAR_NAMES[i]: _GA_VAR_TYPES[i](individual[i])
         for i in range(len(_GA_VAR_NAMES))
@@ -60,9 +62,10 @@ def deap_fitness(individual):
         sim_result["hourly_energy"],
         sim_result["pc_htf_pump_power"],
         sim_result["field_htf_pump_power"],
+        hour_index=hour,
     )
-
-    return (float(obj[0]),)
+    fitness = float(obj)
+    return (fitness,)
 
 
 # ============================================================
@@ -86,13 +89,14 @@ def run_deap_ga_optimisation(
     override: dict,
     static_overrides: dict[str, float],
     is_nested: bool,
+    curr_hour:int,
 ):
     logger = get_run_logger()
 
     if mlflow.active_run() and not is_nested:
         mlflow.end_run()
 
-    with mlflow.start_run(run_name=CONFIG["run_name"], nested=is_nested):
+    with mlflow.start_run(run_name=f"GA_hour_{curr_hour}", nested=is_nested):
         mlflow.set_tag("Author", CONFIG["author"])
         mlflow.log_artifact("config.py")
 
@@ -134,7 +138,7 @@ def run_deap_ga_optimisation(
         )
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-        toolbox.register("evaluate", deap_fitness)
+        toolbox.register("evaluate", partial(deap_fitness, hour=curr_hour))
         toolbox.register(
             "select", tools.selTournament, tournsize=CONFIG.get("tournament_size", 3)
         )
@@ -173,7 +177,7 @@ def run_deap_ga_optimisation(
         )
 
         toolbox.register("map", pool.map)
-        toolbox.register("evaluate", deap_fitness)
+        toolbox.register("evaluate", partial(deap_fitness, hour=curr_hour))
 
         # ----------------------------
         # Stable checkpoint key
@@ -303,6 +307,8 @@ def run_deap_ga_optimisation(
         # Pretty console output (same style as your original code)
         # ----------------------------
         if CONFIG.get("verbose", True):
+            print("\n" + "-" * 40)
+            print(f'Results for hour = {curr_hour}')
             print("\n" + "-" * 40)
             print("Final Best Solutions")
             print("-" * 40)

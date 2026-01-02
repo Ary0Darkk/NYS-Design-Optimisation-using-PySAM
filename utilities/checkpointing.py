@@ -2,6 +2,7 @@ import os
 import pickle
 import tempfile
 
+
 def atomic_pickle_dump(obj, path):
     path = str(path)
     dir_name = os.path.dirname(path)

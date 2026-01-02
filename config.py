@@ -17,10 +17,10 @@ CONFIG = {
     # optimiser -> choose "ga" or "fmincon"
     "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
-    "resume_from_checkpoint": True,
+    "resume_from_checkpoint": False,
     "force_update": False,
     "storage_block": "local-file-system/gdrive-storage",
-    "num_cores":8,
+    "num_cores": 1000,
     # overrides
     "design": {
         "overrides": [
@@ -32,9 +32,8 @@ CONFIG = {
             # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "x0": [10, 4, 3, 50],
         "lb": [5, 2, 1, 40],
-        "ub": [20, 10, 10, 140],
+        "ub": [20, 10, 10, 150],
         "types": [
             float,
             int,
@@ -50,7 +49,6 @@ CONFIG = {
             "T_shutdown",  # shutdown temp
         ],
         # Bounds
-        "x0": [40, 40],
         "lb": [30, 30],
         "ub": [100, 135],
         "types": [float, float],

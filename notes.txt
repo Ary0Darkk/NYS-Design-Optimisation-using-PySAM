@@ -70,3 +70,12 @@ So we can't further optimise assigning variables in simulation
 Now, I am working on caching simulation to save time. I found out that using dict can't help me.So I have canonicalise it and use tuple. Even use or custom hashing function.
 
 Now, I am caching my data to gdrive but only caching is working, I need to make checkpointing work too.
+
+2026-1-2
+Now I have implemented mutiprocessing and it is much faster!
+So now I have to implement how it will run for each hour and store it.
+And how to add seasonlity thing in this.
+I have removed caching my checkpoints to gdrive. It's a bit of tedious and not good for all these tasks.
+
+I have implemented for whole year. Now I can see estimate that it will take around 10 days to complete it.
+I can divide in two PCs.

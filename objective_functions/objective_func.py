@@ -18,6 +18,7 @@ def objective_function(
     hourly_energy: list[float],
     field_htf_pump_power: list[float],
     pc_htf_pump_power: list[float],
+    hour_index: int,
 ) -> float:
     """
     Calculates the objective function for optimisation
@@ -46,9 +47,9 @@ def objective_function(
     # print(dynamic_price_df.head())
 
     obj = (
-        hourly_energy_df * dynamic_price_df
-        - field_htf_pump_power_df * dynamic_price_df
-        - pc_htf_pump_power_df * dynamic_price_df
+        hourly_energy_df[hour_index] * dynamic_price_df[hour_index]
+        - field_htf_pump_power_df[hour_index] * dynamic_price_df[hour_index]
+        - pc_htf_pump_power_df[hour_index] * dynamic_price_df[hour_index]
     ) * 1_000
 
     # print(obj.head())
