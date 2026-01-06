@@ -71,14 +71,14 @@ def get_dynamic_price() -> pd.DataFrame:
     demand_data = formatted_data["Hourly Demand Met (in MW)"]
     dynamic_price_data = calc_dynamic_price(demand_data=demand_data)
 
-    dynamic_price_data_df = dynamic_price_data.to_frame(name="dynamic price")
+    dynamic_price_data_df = dynamic_price_data.to_frame(name="dynamic_price")
 
     final_dataset = pd.concat([formatted_data, dynamic_price_data_df], axis=1)
 
     if CONFIG["show_price_plot"] is True:
         plt.plot(
             final_dataset["DateTime"],
-            final_dataset["dynamic price"],
+            final_dataset["dynamic_price"],
         )
         plt.show()
 

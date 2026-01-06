@@ -32,26 +32,26 @@ def objective_function(
     """
 
     # convert them into df
-    hourly_energy_df = pd.Series(hourly_energy, name="hourly_energy")
-    field_htf_pump_power_df = pd.Series(
-        field_htf_pump_power, name="field_htf_pump_power"
-    )
-    # print(field_htf_pump_power_df.head())
-    pc_htf_pump_power_df = pd.Series(pc_htf_pump_power, name="pc_htf_pump_power")
+    data = {
+        "hourly_energy": hourly_energy,
+        "field_htf_pump_power": field_htf_pump_power,
+        "pc_htf_pump_power": pc_htf_pump_power,
+        "dynamic_price": get_dynamic_price()["dynamic_price"].values,
+    }
 
-    # access final dataset
-    final_dataset = get_dynamic_price()
-    dynamic_price_df = final_dataset["dynamic price"]
-    # print(hourly_energy_df.head())
-    # print(pc_htf_pump_power_df.head())
-    # print(dynamic_price_df.head())
+    # 2. Create the DataFrame all at once
+    df = pd.DataFrame(data)
+
+    # 3. Shift the index to start at 1
+    df.index = df.index + 1
+
+    # If you need to access them individually later:
+    # hourly_energy_df = df["hourly_energy"]
 
     obj = (
-        hourly_energy_df[hour_index] * dynamic_price_df[hour_index]
-        - field_htf_pump_power_df[hour_index] * dynamic_price_df[hour_index]
-        - pc_htf_pump_power_df[hour_index] * dynamic_price_df[hour_index]
+        df["hourly_energy"][hour_index] * df["dynamic_price"][hour_index]
+        - df["field_htf_pump_power"][hour_index] * df["dynamic_price"][hour_index]
+        - df["pc_htf_pump_power"][hour_index] * df["dynamic_price"][hour_index]
     ) * 1_000
-
-    # print(obj.head())
 
     return obj

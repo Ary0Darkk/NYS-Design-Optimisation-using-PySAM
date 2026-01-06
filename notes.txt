@@ -79,3 +79,9 @@ I have removed caching my checkpoints to gdrive. It's a bit of tedious and not g
 
 I have implemented for whole year. Now I can see estimate that it will take around 10 days to complete it.
 I can divide in two PCs.
+
+References for electricity data : https://iced.niti.gov.in/energy/electricity/distribution/national-level-consumption/load-curve
+
+Now I am just left with implementing it based on seasonlity.
+
+2026-1-6

@@ -47,8 +47,7 @@ def init_worker(
 # ============================================================
 # FITNESS FUNCTION (MUST BE TOP-LEVEL)
 # ============================================================
-def deap_fitness(individual,hour):
-
+def deap_fitness(individual, hour):
     overrides_dyn = {
         _GA_VAR_NAMES[i]: _GA_VAR_TYPES[i](individual[i])
         for i in range(len(_GA_VAR_NAMES))
@@ -89,7 +88,7 @@ def run_deap_ga_optimisation(
     override: dict,
     static_overrides: dict[str, float],
     is_nested: bool,
-    curr_hour:int,
+    curr_hour: int,
 ):
     logger = get_run_logger()
 
@@ -308,7 +307,7 @@ def run_deap_ga_optimisation(
         # ----------------------------
         if CONFIG.get("verbose", True):
             print("\n" + "-" * 40)
-            print(f'Results for hour = {curr_hour}')
+            print(f"Results for hour = {curr_hour}")
             print("\n" + "-" * 40)
             print("Final Best Solutions")
             print("-" * 40)

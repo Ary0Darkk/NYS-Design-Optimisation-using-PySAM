@@ -15,7 +15,7 @@ CONFIG = {
     "show_demand_plot": False,
     "show_price_plot": False,
     # optimiser -> choose "ga" or "fmincon"
-    "optimiser": "deap_ga",  # Initial guess
+    "optimiser": "rl_optim",  # Initial guess
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
     "force_update": False,
@@ -63,6 +63,12 @@ CONFIG = {
     "mutpb": 0.2,
     "indpb": 0.2,
     "verbose": True,
+    # rl-based optimisation settings
+    "rl_max_steps": 5,
+    "rl_eval_steps": 10,
+    "rl_lr": 3e-2,
+    "rl_checkpoint_freq": 20,
+    "rl_timesteps": 20,
     # nlopt-fmincon settings
     "nlopt_algorithm": "LD_SLSQP",
     "maxeval": 3,

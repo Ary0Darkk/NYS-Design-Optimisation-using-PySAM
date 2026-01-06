@@ -1,0 +1,89 @@
+import gymnasium as gym
+from gymnasium import spaces
+import numpy as np
+
+from simulation.simulation import run_simulation
+from objective_functions.objective_func import objective_function
+
+
+class SolarMixedOptimisationEnv(gym.Env):
+    """
+    RL environment compatible with GA objective.
+    Action = continuous, internally mapped to int/float.
+    """
+
+    metadata = {"render_modes": []}
+
+    def __init__(
+        self,
+        var_names,
+        var_types,
+        lb,
+        ub,
+        static_overrides,
+        hour_index,
+        max_steps,
+    ):
+        super().__init__()
+
+        self.var_names = var_names
+        self.var_types = var_types
+        self.lb = np.array(lb, dtype=np.float32)
+        self.ub = np.array(ub, dtype=np.float32)
+        self.static_overrides = static_overrides
+        self.hour_index = hour_index
+
+        self.action_space = spaces.Box(
+            low=self.lb,
+            high=self.ub,
+            dtype=np.float32,
+        )
+
+        self.observation_space = self.action_space
+
+        self.max_steps = max_steps
+        self.current_step = 0
+        self.state = None
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.current_step = 0
+        self.state = self.action_space.sample()
+        # self.state = np.zeros_like(self.action_space.low)
+        return self.state, {}
+
+    def step(self, action):
+        self.current_step += 1
+
+        # ---- Mixed variable handling (same as GA) ----
+        overrides_dyn = {}
+        for i, name in enumerate(self.var_names):
+            val = action[i]
+            if self.var_types[i] is int:
+                val = int(round(val))
+            val = max(self.lb[i], min(self.ub[i], val))
+            overrides_dyn[name] = self.var_types[i](
+                val
+            )  # type casting self.var_types[i] -> int or float then (val) type cast val into that type
+        self.last_overrides = overrides_dyn
+
+        final_overrides = {**overrides_dyn, **self.static_overrides}
+
+        # ---- Run simulation ----
+        sim_result = run_simulation(final_overrides)
+
+        obj = objective_function(
+            sim_result["hourly_energy"],
+            sim_result["pc_htf_pump_power"],
+            sim_result["field_htf_pump_power"],
+            hour_index=self.hour_index,
+        )
+
+        reward = np.float32(obj)
+
+        self.state = np.array(list(overrides_dyn.values()), dtype=np.float32)
+
+        terminated = False
+        truncated = self.current_step >= self.max_steps
+
+        return self.state, reward, terminated, truncated, {"overrides": overrides_dyn}
