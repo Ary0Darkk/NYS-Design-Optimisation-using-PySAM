@@ -1,8 +1,10 @@
-from config import CONFIG
-from router import run_router
+import os
 import argparse
 import glob
-import os
+import httpx
+
+from config import CONFIG
+from router import run_router
 
 from prefect import flow
 from prefect.logging import get_run_logger
@@ -70,5 +72,15 @@ if __name__ == "__main__":
         print("[REPRO] Overriding CONFIG with loaded values...")
         CONFIG.update(repro_cfg if "CONFIG" not in repro_cfg else repro_cfg["CONFIG"])
 
-    # proceed with normal run using modified CONFIG
-    main(CONFIG["force_update"])
+    try:
+        # proceed with normal run using modified CONFIG
+        main(CONFIG["force_update"])
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by User! Shutting down workers...")
+    except (httpx.ConnectError, ConnectionError) as err:
+        print(f'f"CRITICAL: Could not connect to Prefect Server error!')
+        print(f"Error : {err}")
+    except Exception as err:
+        print(f"An unexpected error occurred: {err}")
+    # finally:
+    #     print("Optimisation completed! /nCheck the mlflow UI for details!")

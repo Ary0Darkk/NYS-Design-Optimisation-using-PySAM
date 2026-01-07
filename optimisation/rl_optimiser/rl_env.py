@@ -2,8 +2,8 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 
-from simulation.simulation import run_simulation
-from objective_functions.objective_func import objective_function
+from simulation import run_simulation
+from objective_functions import objective_function
 
 
 class SolarMixedOptimisationEnv(gym.Env):

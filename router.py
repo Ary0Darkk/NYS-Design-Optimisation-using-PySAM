@@ -1,22 +1,14 @@
 # file to route design optimisation and operational one
 from typing import Optional
 
-from optimisation.ga_optimiser import run_ga_optimisation
-from optimisation.fmincon_optimiser import run_fmincon_optimisation
-from optimisation.pygad_ga_optimiser import run_pyga_optimisation
-from optimisation.scipy_fmincon import run_scipy_minimise
-from optimisation.nlopt_fmincon import run_nlopt
-from optimisation.deap_ga_optimiser import run_deap_ga_optimisation
-from optimisation.rl_optimiser.ppo_rl_training import train_rl
+from optimisation import *
 
 from config import CONFIG
 import mlflow
 import dagshub
 
 from prefect import task
-from prefect.tasks import task_input_hash
 from prefect.logging import get_run_logger
-from datetime import timedelta
 
 
 @task()

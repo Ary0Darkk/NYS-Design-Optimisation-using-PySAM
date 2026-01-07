@@ -14,6 +14,7 @@ dependencies = [
     "nrel-pysam>=7.1.0",
     "openpyxl>=3.1.5",
     "prefect>=3.6.8",
+    "prefect-ray>=0.4.5",
     "prefect-sqlalchemy>=0.5.3",
     "pygad>=3.5.0",
     "pylint>=4.0.4",

@@ -7,7 +7,7 @@ from prefect import task
 
 import multiprocessing
 
-from optimisation.rl_optimiser.rl_env import SolarMixedOptimisationEnv
+from .rl_env import SolarMixedOptimisationEnv
 from config import CONFIG
 
 

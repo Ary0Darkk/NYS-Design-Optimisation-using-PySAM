@@ -14,8 +14,8 @@ from prefect.logging import get_run_logger
 
 from utilities.checkpointing import atomic_pickle_dump
 from config import CONFIG
-from simulation.simulation import run_simulation
-from objective_functions.objective_func import objective_function
+from simulation import run_simulation
+from objective_functions import objective_function
 
 
 # ----------------------------

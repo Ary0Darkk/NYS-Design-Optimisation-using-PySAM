@@ -85,3 +85,13 @@ References for electricity data : https://iced.niti.gov.in/energy/electricity/di
 Now I am just left with implementing it based on seasonlity.
 
 2026-1-6
+I have implemented RL optimiser with PPO as algorithm and enabled multiprocessing to speed up the process. And I have successfully done that.
+
+2026-1-7
+Now I am thinking to try out different RL alogorithms and see which one suits best to our problem.
+Also I am experimenting with prefect and ray integration called "prefect_ray" to further speed up the process of optimisation.
+I found ray uses cores to speed up process too, but multiprocessing copies same data again and again for number of workers instantiated, while ray doesn't do this. But currently I am going with multiprocessing, because I think I really don't have that much big data, so I need not to worry about this.
+
+Now I am thinking to use MinIO for local storage cause it is same as S3-Amazon service and I can set it up in Linux one cause it has 1TB storage disk.
+
+Removed the fluff of import in router.py file by initialising imports in __init__.py file. And dunder method "all" defines what all to be imported when using asterisk to import all.
