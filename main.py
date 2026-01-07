@@ -78,7 +78,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nProcess interrupted by User! Shutting down workers...")
     except (httpx.ConnectError, ConnectionError) as err:
-        print(f'f"CRITICAL: Could not connect to Prefect Server error!')
+        print('f"CRITICAL: Could not connect to Prefect Server error!')
         print(f"Error : {err}")
     except Exception as err:
         print(f"An unexpected error occurred: {err}")

@@ -158,7 +158,7 @@ def run_router():
             logger.debug(
                 "Going to begin Design plus Operational optimisation sequentially!\n\n"
             )
-            logger.debug(f"Design optimisation started !")
+            logger.debug("Design optimisation started !")
             # print(f"Optimisation of : {override}")
             optimals = run_hourly_optimisation(
                 override=CONFIG["design"], is_nested=is_nested
@@ -167,7 +167,7 @@ def run_router():
             if optimals is not None:
                 design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
 
-                logger.debug(f"Operational optimisation started !")
+                logger.debug("Operational optimisation started !")
                 # print(f"Optimisation of : {override}")
                 run_hourly_optimisation(
                     override=CONFIG["operational"],

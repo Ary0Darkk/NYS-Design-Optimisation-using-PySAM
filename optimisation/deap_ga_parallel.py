@@ -1,25 +1,17 @@
 import random
 import numpy as np
-import mlflow
-import pickle
 import sys
-import json
 from pathlib import Path
 from deap import base, creator, tools, algorithms
 
 import multiprocessing as mp
 
 from prefect import task
-from prefect.logging import get_run_logger
 
 # Setup path to internal modules
 root_path = str(Path(__file__).resolve().parent.parent)
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
-
-from config import CONFIG
-from simulation.simulation import run_simulation
-from objective_functions.objective_func import objective_function
 
 
 @task()

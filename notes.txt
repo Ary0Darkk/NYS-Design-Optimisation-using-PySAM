@@ -95,3 +95,5 @@ I found ray uses cores to speed up process too, but multiprocessing copies same 
 Now I am thinking to use MinIO for local storage cause it is same as S3-Amazon service and I can set it up in Linux one cause it has 1TB storage disk.
 
 Removed the fluff of import in router.py file by initialising imports in __init__.py file. And dunder method "all" defines what all to be imported when using asterisk to import all.
+
+Now, I have to write test for this code, maybe end-to-end test using Pytest.

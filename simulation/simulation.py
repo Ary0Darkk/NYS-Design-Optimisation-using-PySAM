@@ -11,6 +11,14 @@ from datetime import timedelta
 
 
 def canonicalize_overrides(overrides):
+    """this canonicalize the overrides
+
+    Args:
+        overrides (dict): variables that need to overriden
+
+    Returns:
+        tuple: contains int and float based on type defined in override
+    """
     return tuple(
         sorted(
             (
