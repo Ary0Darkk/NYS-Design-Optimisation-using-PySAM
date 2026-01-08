@@ -1,48 +1,41 @@
 import random
 import numpy as np
-import sys
-from pathlib import Path
+import mlflow
 from deap import base, creator, tools, algorithms
 
 import multiprocessing as mp
+from functools import partial
 
 from prefect import task
+from prefect.logging import get_run_logger
 
-# Setup path to internal modules
-root_path = str(Path(__file__).resolve().parent.parent)
-if root_path not in sys.path:
-    sys.path.insert(0, root_path)
+from simulation import run_simulation
+from config import CONFIG
+
+# individual creation
+if not hasattr(creator, "FitnessMin"):
+    creator.create("FitnessMin", base.Fitness, weights=(1.0,))
+if not hasattr(creator, "Individual"):
+    creator.create("Individual", list, fitness=creator.FitnessMin)
 
 
-@task()
 class GAEngine:
     def __init__(
         self,
-        var_names,
-        var_types,
-        lb,
-        ub,
-        objective_function,
-        run_simulation,
+        override,
         static_overrides,
-        config,
-        logger,
-        mlflow,
     ):
-        self.var_names = var_names
-        self.var_types = var_types
-        self.lb = lb
-        self.ub = ub
-        self.objective_function = objective_function
-        self.run_simulation = run_simulation
+        self.override = override
+        self.var_names = self.override["var_names"]
+        self.var_types = self.override["var_types"]
+        self.lb = self.override["lb"]
+        self.ub = self.override["ub"]
         self.static_overrides = static_overrides
-        self.CONFIG = config
-        self.logger = logger
-        self.mlflow = mlflow
+
         self.pool = mp.Pool(processes=self.CONFIG.get("n_jobs", mp.cpu_count()))
-        self.toolbox.register("map", self.pool.map)
 
         self.toolbox = base.Toolbox()
+        self.toolbox.register("map", self.pool.map)
         self._setup_toolbox()
 
     def _setup_toolbox(self):
@@ -59,11 +52,11 @@ class GAEngine:
             self.toolbox.individual,
         )
 
-        self.toolbox.register("evaluate", self._evaluate)
+        self.toolbox.register("evaluate",self._evaluate)
         self.toolbox.register(
             "select",
             tools.selTournament,
-            tournsize=self.CONFIG.get("tournament_size", 3),
+            tournsize=self.CONFIG.get("tournament_size"),
         )
         self.toolbox.register("mate", tools.cxOnePoint)
 
@@ -78,7 +71,7 @@ class GAEngine:
             random.uniform(self.lb[i], self.ub[i]) for i in range(len(self.var_names))
         ]
 
-    def _evaluate(self, individual):
+    def _evaluate(self, individual, hour):
         t_overrides = {}
         for i, name in enumerate(self.var_names):
             t_overrides[name] = self.var_types[i](individual[i])
@@ -91,9 +84,11 @@ class GAEngine:
             sim_result["hourly_energy"],
             sim_result["pc_htf_pump_power"],
             sim_result["field_htf_pump_power"],
+            hour_index=hour,
         )
+        fitness = float(obj)
 
-        return (float(obj[0]),)
+        return (fitness,)
 
     def _custom_mutation(self, individual, indpb):
         for i in range(len(individual)):
@@ -108,36 +103,63 @@ class GAEngine:
 
         return (individual,)
 
-    def run(self):
-        pop_size = self.CONFIG["pop_size"]
-        cxpb = self.CONFIG["cxpb"]
-        mutpb = self.CONFIG["mutpb"]
-        num_generations = self.CONFIG["num_generations"]
+    def run(self, is_nested, curr_hour):
+        self.logger = get_run_logger()
 
-        pop, hof, logbook, start_gen = self._initialize_or_resume(pop_size)
+        if mlflow.active_run() and not is_nested:
+            mlflow.end_run()
 
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean)
-        stats.register("max", np.max)
+        with mlflow.start_run(run_name=f"GA_hour_{curr_hour}", nested=is_nested):
+            mlflow.set_tag("Author", self.CONFIG["author"])
+            mlflow.log_artifact("config.py")
 
-        if start_gen == 0:
-            self._evaluate_population(pop)
-            hof.update(pop)
+            pop_size = CONFIG["pop_size"]
+            cxpb = CONFIG["cxpb"]
+            mutpb = CONFIG["mutpb"]
+            num_generations = CONFIG["num_generations"]
 
-        for gen in range(start_gen, num_generations):
-            offspring = algorithms.varAnd(pop, self.toolbox, cxpb, mutpb)
-            self._evaluate_population(offspring)
+            self.logger.info("GA started!")
 
-            pop = self.toolbox.select(offspring, k=pop_size)
-            hof.update(pop)
+            pop, hof, logbook, start_gen = self._initialize_or_resume(pop_size)
 
-            record = stats.compile(pop)
-            logbook.record(gen=gen, **record)
-            self.mlflow.log_metrics(record, step=gen)
+            stats = tools.Statistics(lambda ind: ind.fitness.values)
+            stats.register("avg", np.mean)
+            stats.register("max", np.max)
 
-            self._save_checkpoint(gen, pop, hof, logbook)
+            if start_gen == 0:
+                self._evaluate_population(pop)
+                hof.update(pop)
 
-        self.pool.close()
-        self.pool.join()
+            for gen in range(start_gen, num_generations):
+                offspring = algorithms.varAnd(pop, self.toolbox, cxpb, mutpb)
+                self._evaluate_population(offspring)
 
-        return self._finalize(hof)
+                pop = self.toolbox.select(offspring, k=pop_size)
+                hof.update(pop)
+
+                record = stats.compile(pop)
+                logbook.record(gen=gen, **record)
+                self.mlflow.log_metrics(record, step=gen)
+
+                self._save_checkpoint(gen, pop, hof, logbook)
+
+            self.pool.close()
+            self.pool.join()
+
+            return self._finalize(hof)
+
+
+@task()
+def run_deap_ga(
+    override: dict,
+    static_overrides: dict[str, float],
+    is_nested: bool,
+    curr_hour: int,
+):
+    # class instantiation
+    ga = GAEngine(override, static_overrides, curr_hour)
+
+    # runs ga
+    result = ga.run(is_nested, curr_hour)
+
+    return result
