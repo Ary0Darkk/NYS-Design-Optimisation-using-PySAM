@@ -14,8 +14,8 @@ CONFIG = {
     "demand_file_path": "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx",
     "show_demand_plot": False,
     "show_price_plot": False,
-    # optimiser -> choose "ga" or "fmincon"
-    "optimiser": "rl_optim",  # Initial guess
+    # optimiser -> choose "ga" or "fmincon" or "rl_optim"
+    "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
     "force_update": False,

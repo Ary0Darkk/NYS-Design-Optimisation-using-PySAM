@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import pandas as pd
 import mlflow
 import json
 import hashlib
@@ -301,9 +302,11 @@ def run_deap_ga_optimisation(
             # ----------------------------
             # Pretty console output (same style as your original code)
             # ----------------------------
+            res_dict = {}
             if CONFIG.get("verbose", True):
                 print("\n" + "-" * 40)
                 print(f"Results for hour = {curr_hour}")
+                res_dict["hour"]= curr_hour
                 print("\n" + "-" * 40)
                 print("Final Best Solutions")
                 print("-" * 40)
@@ -311,6 +314,7 @@ def run_deap_ga_optimisation(
                 for i, name in enumerate(var_names):
                     val = best_solution[i]
 
+                    res_dict[name] = val        # stores in dict to save data in csv
                     # Match formatting you used earlier
                     if isinstance(val, float):
                         print(f"  {name:20}: {val:.4f}")
@@ -321,9 +325,21 @@ def run_deap_ga_optimisation(
                 print(f"{'Best Fitness':20}: {best_fitness:.6f}")
                 print("-" * 40)
 
+                res_dict["best_fitness"] = best_fitness
+
             logger.info(f"Best solution: {best_solution}")
             logger.info(f"Best fitness: {best_fitness}")
-        
+
+            result_logbook = pd.DataFrame([res_dict])
+
+            result_logbook= result_logbook.set_index("hour")
+
+            file_name = Path(f'results/result_1.csv')
+            file_name.parent.mkdir(exist_ok=True)
+
+            file_exists = file_name.exists()
+            result_logbook.to_csv(file_name, mode='a', header=not file_exists)
+
         return (
             best_solution,
             best_fitness,
