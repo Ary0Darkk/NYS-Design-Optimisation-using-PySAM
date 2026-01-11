@@ -2,6 +2,7 @@
 from typing import Optional
 
 from optimisation import *
+from optimisation.rl_optimiser.rl_tuner import run_rl_study
 
 from config import CONFIG
 import mlflow
@@ -94,6 +95,14 @@ def call_optimiser(
 
 
 @task()
+def call_tuner(override: dict[str, list[float]]):
+    # call run study
+    run_rl_study(
+        override=override,
+    )
+
+
+@task()
 def run_hourly_optimisation(
     override: dict[str, list[float]],
     is_nested: bool,
@@ -124,6 +133,7 @@ def run_hourly_optimisation(
 @task()
 def run_router():
     logger = get_run_logger()
+
     # database setup
     mlflow.set_tracking_uri(
         "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
@@ -134,46 +144,52 @@ def run_router():
         mlflow=True,
     )
 
-    # optimisation
-    opt_type = CONFIG.get("optimiser")
+    if CONFIG.get("is_tuning", False):
+        # set experiment name
+        mlflow.set_experiment(f"rl-tuning")
 
-    # set experiment name
-    mlflow.set_experiment(f"{opt_type}-optimisation")
-
-    # design and operational optim logic
-    optimals = None
-
-    override = optimisation_mode()
-
-    # only perfoms single optim
-    if override != "design_operational":
-        logger.debug(f"{CONFIG['route']} optimisation started !")
-        # print(f"Optimisation of : {override}")
-        run_hourly_optimisation(override, is_nested=False)
-    # perform both optim in sequence
+        call_tuner(override=CONFIG["design"])
     else:
-        is_nested = True  # informs mlflow for multi-step run
-        # 1. Start a Parent Run to group everything
-        with mlflow.start_run(run_name="Sequential des-operational"):
-            logger.debug(
-                "Going to begin Design plus Operational optimisation sequentially!\n\n"
-            )
-            logger.debug("Design optimisation started !")
+        # optimisation
+        opt_type = CONFIG.get("optimiser")
+
+        # set experiment name
+        mlflow.set_experiment(f"{opt_type}-optimisation")
+
+        # design and operational optim logic
+        optimals = None
+
+        override = optimisation_mode()
+
+        # only perfoms single optim
+        if override != "design_operational":
+            logger.debug(f"{CONFIG['route']} optimisation started !")
             # print(f"Optimisation of : {override}")
-            optimals = run_hourly_optimisation(
-                override=CONFIG["design"], is_nested=is_nested
-            )
-
-            if optimals is not None:
-                design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
-
-                logger.debug("Operational optimisation started !")
+            run_hourly_optimisation(override, is_nested=False)
+        # perform both optim in sequence
+        else:
+            is_nested = True  # informs mlflow for multi-step run
+            # 1. Start a Parent Run to group everything
+            with mlflow.start_run(run_name="Sequential des-operational"):
+                logger.debug(
+                    "Going to begin Design plus Operational optimisation sequentially!\n\n"
+                )
+                logger.debug("Design optimisation started !")
                 # print(f"Optimisation of : {override}")
-                run_hourly_optimisation(
-                    override=CONFIG["operational"],
-                    static_overrides=design_dict,
-                    is_nested=is_nested,
+                optimals = run_hourly_optimisation(
+                    override=CONFIG["design"], is_nested=is_nested
                 )
 
-            else:
-                logger.warning("Design optimisation is not performed yet!")
+                if optimals is not None:
+                    design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
+
+                    logger.debug("Operational optimisation started !")
+                    # print(f"Optimisation of : {override}")
+                    run_hourly_optimisation(
+                        override=CONFIG["operational"],
+                        static_overrides=design_dict,
+                        is_nested=is_nested,
+                    )
+
+                else:
+                    logger.warning("Design optimisation is not performed yet!")

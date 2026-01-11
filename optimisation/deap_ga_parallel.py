@@ -52,7 +52,7 @@ class GAEngine:
             self.toolbox.individual,
         )
 
-        self.toolbox.register("evaluate",self._evaluate)
+        self.toolbox.register("evaluate", self._evaluate)
         self.toolbox.register(
             "select",
             tools.selTournament,

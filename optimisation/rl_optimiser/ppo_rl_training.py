@@ -8,9 +8,11 @@ from prefect import task
 import multiprocessing
 
 from .rl_env import SolarMixedOptimisationEnv
+from .rl_util import TrialEvalCallback
 from config import CONFIG
 
 
+# creates envs
 def make_env(
     var_names,
     var_types,
@@ -40,6 +42,9 @@ def train_rl(
     static_overrides,
     hour_index,
     is_nested=False,
+    tuned_hyperparams=None,  # dict from Optuna
+    is_tuning=False,  # flag to change behavior
+    trial=None,  # Optuna Trial object
 ):
     var_names = override["overrides"]
     var_types = override["types"]
@@ -77,6 +82,14 @@ def train_rl(
 
         model_path = ckpt_dir / "ppo_latest.zip"
 
+        # ---- Handle Hyperparameters ----
+        # We prioritize Optuna, then fallback to CONFIG, then fallback to SB3 defaults
+        hp = tuned_hyperparams or {}
+
+        def get_val(key, default):
+            # checks Optuna trial, global CONFIG, Hardcoded fallback
+            return hp.get(key, CONFIG.get(f"rl_{key}", default))
+
         # ---- Resume or fresh ----
         if model_path.exists() and CONFIG.get("resume_from_checkpoint", False):
             model = PPO.load(model_path, env=env)
@@ -84,16 +97,17 @@ def train_rl(
             model = PPO(
                 "MlpPolicy",
                 env,
-                learning_rate=3e-4,
-                n_steps=20,
-                batch_size=10,
+                learning_rate=get_val("learning_rate", 3e-4),
+                n_steps=get_val("n_steps", 20),
+                batch_size=get_val("batch_size", 10),
+                ent_coef=get_val("ent_coef", 0.01),
+                gamma=get_val("gamma", 0.99),
                 n_epochs=10,
-                gamma=0.99,
                 gae_lambda=0.95,
                 clip_range=0.2,
-                ent_coef=0.01,
                 device="cpu",  # available
                 verbose=1,
+                seed=CONFIG.get("random_seed", 21),
             )
 
         checkpoint_cb = CheckpointCallback(
@@ -101,6 +115,23 @@ def train_rl(
             save_path=str(ckpt_dir),
             name_prefix="ppo",
         )
+
+        # ---- Add Pruning Callback ----
+        callbacks = [checkpoint_cb]
+        if is_tuning and trial:
+            # This allows Optuna to kill bad trials early
+            eval_env = make_env(
+                var_names,
+                var_types,
+                lb,
+                ub,
+                static_overrides,
+                hour_index,
+                CONFIG["rl_max_steps"],
+            )()
+            # This is the custom class we discussed that reports back to 'trial'
+            tuning_cb = TrialEvalCallback(eval_env, trial, eval_freq=2000)
+            callbacks.append(tuning_cb)
 
         total_timesteps = CONFIG.get("rl_timesteps", 2)
 

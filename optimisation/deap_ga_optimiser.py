@@ -91,7 +91,6 @@ def run_deap_ga_optimisation(
     is_nested: bool,
     curr_hour: int,
 ):
-    
     try:
         logger = get_run_logger()
 
@@ -142,7 +141,9 @@ def run_deap_ga_optimisation(
 
             toolbox.register("evaluate", partial(deap_fitness, hour=curr_hour))
             toolbox.register(
-                "select", tools.selTournament, tournsize=CONFIG.get("tournament_size", 3)
+                "select",
+                tools.selTournament,
+                tournsize=CONFIG.get("tournament_size", 3),
             )
             toolbox.register("mate", tools.cxOnePoint)
 
@@ -197,7 +198,9 @@ def run_deap_ga_optimisation(
                 ).encode()
             ).hexdigest()[:12]
 
-            checkpoint_dir = Path(__file__).resolve().parents[1] / "checkpoints" / ckpt_key
+            checkpoint_dir = (
+                Path(__file__).resolve().parents[1] / "checkpoints" / ckpt_key
+            )
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
             resume_file = checkpoint_dir / "checkpoint_latest.pkl"
@@ -267,7 +270,9 @@ def run_deap_ga_optimisation(
                 if gen % CONFIG.get("checkpoint_interval", 2) == 0:
                     gen_file = checkpoint_dir / f"checkpoint_gen_{gen}.pkl"
                     atomic_pickle_dump(cp_data, gen_file)
-                    mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
+                    mlflow.log_artifact(
+                        str(gen_file), artifact_path="checkpoints/history"
+                    )
 
             # ----------------------------
             # Final result
@@ -306,7 +311,7 @@ def run_deap_ga_optimisation(
             if CONFIG.get("verbose", True):
                 print("\n" + "-" * 40)
                 print(f"Results for hour = {curr_hour}")
-                res_dict["hour"]= curr_hour
+                res_dict["hour"] = curr_hour
                 print("\n" + "-" * 40)
                 print("Final Best Solutions")
                 print("-" * 40)
@@ -314,7 +319,7 @@ def run_deap_ga_optimisation(
                 for i, name in enumerate(var_names):
                     val = best_solution[i]
 
-                    res_dict[name] = val        # stores in dict to save data in csv
+                    res_dict[name] = val  # stores in dict to save data in csv
                     # Match formatting you used earlier
                     if isinstance(val, float):
                         print(f"  {name:20}: {val:.4f}")
@@ -332,13 +337,13 @@ def run_deap_ga_optimisation(
 
             result_logbook = pd.DataFrame([res_dict])
 
-            result_logbook= result_logbook.set_index("hour")
+            result_logbook = result_logbook.set_index("hour")
 
-            file_name = Path(f'results/result_1.csv')
+            file_name = Path(f"results/result_1.csv")
             file_name.parent.mkdir(exist_ok=True)
 
             file_exists = file_name.exists()
-            result_logbook.to_csv(file_name, mode='a', header=not file_exists)
+            result_logbook.to_csv(file_name, mode="a", header=not file_exists)
 
         return (
             best_solution,
@@ -349,10 +354,8 @@ def run_deap_ga_optimisation(
                 "hof": hof,
             },
         )
-        
+
     finally:
         # clean pool
         pool.close()
         pool.join()
-
-
