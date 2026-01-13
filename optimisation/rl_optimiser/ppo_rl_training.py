@@ -111,7 +111,7 @@ def train_rl(
             )
 
         checkpoint_cb = CheckpointCallback(
-            save_freq=CONFIG.get("rl_checkpoint_freq"),
+            save_freq=CONFIG.get("rl_checkpoint_freq", 10),
             save_path=str(ckpt_dir),
             name_prefix="ppo",
         )
@@ -130,7 +130,7 @@ def train_rl(
                 CONFIG["rl_max_steps"],
             )()
             # This is the custom class we discussed that reports back to 'trial'
-            tuning_cb = TrialEvalCallback(eval_env, trial, eval_freq=2000)
+            tuning_cb = TrialEvalCallback(eval_env, trial, eval_freq=20)
             callbacks.append(tuning_cb)
 
         total_timesteps = CONFIG.get("rl_timesteps", 2)

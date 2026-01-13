@@ -1,6 +1,7 @@
 import optuna
+from prefect import task
 from prefect.logging import get_run_logger
-from optimisation.rl_optimiser import train_rl
+from .ppo_rl_training import train_rl
 
 
 def objective(
@@ -9,6 +10,7 @@ def objective(
 ):
     logger = get_run_logger()
     # Optuna will pick new values for these for every trial
+    # define your hyperparamters range
     tuning_params = {
         "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True),
         "n_steps": trial.suggest_categorical("n_steps", [16, 32, 64, 128]),
@@ -17,15 +19,14 @@ def objective(
         "gamma": trial.suggest_float("gamma", 0.9, 0.9999),
     }
 
-    # Call your training function with these new values
-    # We modify your train_rl to accept these (see Step 2)
+    # calls training function
     _, best_reward, _ = train_rl(
         override=override,
         static_overrides={},
         hour_index=1,
-        tuned_hyperparams=tuning_params,  # Pass the suggestions here
+        tuned_hyperparams=tuning_params,
         is_tuning=True,
-        trial=trial,  # Pass the trial object for pruning
+        trial=trial,  # pass the trial object for pruning
     )
 
     logger.info(f"Best reward : {best_reward}")
@@ -33,6 +34,7 @@ def objective(
     return best_reward
 
 
+@task()
 def run_rl_study(override):
     logger = get_run_logger()
     # This DB allows your 2 PCs to share the same tuning work
@@ -47,6 +49,8 @@ def run_rl_study(override):
         pruner=optuna.pruners.MedianPruner(),  # Kills bad runs early
     )
     logger.info("Now optimising it!")
-    study.optimize(lambda trial: objective(trial, override), n_trials=50)
+    study.optimize(
+        lambda trial: objective(trial, override), n_trials=2, show_progress_bar=True
+    )
 
     logger.info("Finished optimisation!")
