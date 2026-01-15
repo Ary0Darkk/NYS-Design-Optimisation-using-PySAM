@@ -1,6 +1,9 @@
 # env variables
 .venv
 
+# secret variables
+.env
+
 # cache
 __pycache__
 simulation/__pycache__

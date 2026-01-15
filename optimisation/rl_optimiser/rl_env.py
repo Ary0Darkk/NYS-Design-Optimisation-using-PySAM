@@ -81,8 +81,22 @@ class SolarMixedOptimisationEnv(gym.Env):
 
         reward = np.float32(obj)
 
+        # TODO : Add your constraints here, refer to below example
+        # Check Constraints (e.g., Battery SoC)
+        # battery_soc = next_state[0] 
+        
+        # if battery_soc < 0.2:
+        #     # Apply a heavy penalty
+        #     penalty = -50.0 
+        #     reward += penalty
+            
+            # Optional: End the episode early if the constraint is critical
+            # done = True
+
+
         self.state = np.array(list(overrides_dyn.values()), dtype=np.float32)
 
+        # ---- max steps limit ----
         terminated = False
         truncated = self.current_step >= self.max_steps
 

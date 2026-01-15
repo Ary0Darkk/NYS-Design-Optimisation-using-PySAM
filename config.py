@@ -14,7 +14,7 @@ CONFIG = {
     "demand_file_path": "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx",
     "show_demand_plot": False,
     "show_price_plot": False,
-    "is_tuning": True,
+    "is_tuning": False,
     # optimiser -> choose "ga" or "fmincon" or "rl_optim"
     "optimiser": "deap_ga",  # Initial guess
     "route": "design",  # des-operational
@@ -30,16 +30,17 @@ CONFIG = {
             "ColperSCA",  # num of modules per SCA
             "W_aperture",  # width of SCA
             "L_SCA",  # length of collector assembly
-            # "nSCA",  # number of SCA per loop
+            "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "lb": [5, 2, 1, 40],
-        "ub": [20, 10, 10, 150],
+        "lb": [5, 2, 1, 40,2],
+        "ub": [20, 10, 10, 150,10],
         "types": [
             float,
             int,
             float,
             float,
+            int,
         ],
     },
     "operational": {
