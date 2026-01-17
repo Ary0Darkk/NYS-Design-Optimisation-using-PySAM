@@ -354,12 +354,12 @@ def run_deap_ga_optimisation(
                 "hof": hof,
             },
         )
-    
+
     except KeyboardInterrupt:
-        print('Interrupted by User!\nStopping...')
+        print("Interrupted by User!\nStopping...")
 
     finally:
         # clean pool
         pool.close()
         pool.join()
-        print('Flushed all processes!')
+        print("Flushed all processes!")

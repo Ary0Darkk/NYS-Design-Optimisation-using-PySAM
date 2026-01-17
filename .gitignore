@@ -3,6 +3,7 @@
 
 # secret variables
 .env
+rootkey.csv
 
 # cache
 __pycache__

@@ -41,8 +41,7 @@ def simulation_cache_key(context, parameters):
 @task(
     cache_key_fn=simulation_cache_key,
     persist_result=True,
-    refresh_cache=False,
-    cache_expiration=timedelta(days=1),
+    cache_expiration=timedelta(days=30),
     result_storage=CONFIG["storage_block"],
 )
 def run_simulation(overrides):

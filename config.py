@@ -20,7 +20,7 @@ CONFIG = {
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
     "force_update": False,
-    "storage_block": "local-file-system/gdrive-storage",
+    "storage_block": "s3-bucket/s3-cache",
     "num_cores": 1000,
     # overrides
     "design": {
@@ -30,17 +30,16 @@ CONFIG = {
             "ColperSCA",  # num of modules per SCA
             "W_aperture",  # width of SCA
             "L_SCA",  # length of collector assembly
-            "nSCA",  # number of SCA per loop
+            # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "lb": [5, 2, 1, 40,2],
-        "ub": [20, 10, 10, 150,10],
+        "lb": [5, 2, 1, 40],
+        "ub": [20, 10, 10, 150],
         "types": [
             float,
             int,
             float,
             float,
-            int,
         ],
     },
     "operational": {
@@ -56,7 +55,7 @@ CONFIG = {
         "types": [float, float],
     },
     # deap-ga optimisation settings
-    "random_seed": 21,
+    "random_seed": 33,
     "tournament_size": 2,
     "mutation_num_genes": 5,
     "sol_per_pop": 4,
