@@ -12,15 +12,15 @@ from prefect import task
 from prefect.logging import get_run_logger
 
 
-@task()
+@task
 def optimisation_mode() -> str | dict[str, list[float]]:
     logger = get_run_logger()
 
     override = None
     if CONFIG["route"] == "design":
-        override = CONFIG["design"]
+        override = "design"
     elif CONFIG["route"] == "operational":
-        override = CONFIG["operational_overrides"]
+        override = "operational"
     elif CONFIG["route"] == "des-operational":
         override = "design_operational"
     else:
@@ -31,9 +31,10 @@ def optimisation_mode() -> str | dict[str, list[float]]:
     return override
 
 
-@task()
+@task
 def call_optimiser(
     override: dict[str, list[float]],
+    optim_mode: str,
     is_nested: bool,
     target_hour: int,
     static_overrides: Optional[dict[str, float]] = None,
@@ -66,6 +67,7 @@ def call_optimiser(
         elif opt_type == "deap_ga":
             x_opt, f_val, o_metrices = run_deap_ga_optimisation(
                 override=override,
+                optim_mode=optim_mode,
                 static_overrides=static_overrides,
                 is_nested=is_nested,
                 curr_hour=target_hour,
@@ -73,6 +75,7 @@ def call_optimiser(
         elif opt_type == "rl_optim":
             x_opt, f_val, o_metrices = train_rl(
                 override=override,
+                optim_mode=optim_mode,
                 static_overrides=static_overrides,
                 is_nested=is_nested,
                 hour_index=target_hour,
@@ -94,7 +97,7 @@ def call_optimiser(
     return x_opt, f_val, o_metrices
 
 
-@task()
+@task
 def call_tuner(override: dict[str, list[float]]):
     # call run study
     run_rl_study(
@@ -102,21 +105,23 @@ def call_tuner(override: dict[str, list[float]]):
     )
 
 
-@task()
+@task
 def run_hourly_optimisation(
     override: dict[str, list[float]],
+    optim_mode: str,
     is_nested: bool,
     static_overrides: Optional[dict[str, float]] = None,
 ):
     results = {}
 
     for hour in range(1, 8761):
-        print(f"\n{'-' * 20}")
+        print(f"\n{'-' * 40}")
         print(f"Optimising for hour {hour}")
-        print(f"{'-' * 20}")
+        print(f"{'-' * 40}")
 
         best_x, best_f, _ = call_optimiser(
             override=override,
+            optim_mode=optim_mode,
             static_overrides=static_overrides,
             is_nested=is_nested,
             target_hour=hour,
@@ -130,7 +135,7 @@ def run_hourly_optimisation(
     return results
 
 
-@task()
+@task
 def run_router():
     logger = get_run_logger()
 
@@ -162,34 +167,54 @@ def run_router():
         override = optimisation_mode()
 
         # only perfoms single optim
-        if override != "design_operational":
-            logger.debug(f"{CONFIG['route']} optimisation started !")
+
+        if override == "design":
+            logger.info(f"{CONFIG['route']} optimisation started !")
             # print(f"Optimisation of : {override}")
-            run_hourly_optimisation(override, is_nested=False)
+            call_optimiser(
+                override=CONFIG["design"],
+                target_hour=1,
+                optim_mode="design",
+                is_nested=False,
+            )
+
+        elif override == "operational":
+            logger.info(f"{CONFIG['route']} optimisation started !")
+            run_hourly_optimisation(
+                override=CONFIG["operational"],
+                optim_mode="operational",
+                is_nested=False,
+            )
         # perform both optim in sequence
-        else:
+        elif override == "design_operational":
             is_nested = True  # informs mlflow for multi-step run
             # 1. Start a Parent Run to group everything
             with mlflow.start_run(run_name="Sequential des-operational"):
-                logger.debug(
+                logger.info(
                     "Going to begin Design plus Operational optimisation sequentially!\n\n"
                 )
-                logger.debug("Design optimisation started !")
+                logger.info("Design optimisation started !")
                 # print(f"Optimisation of : {override}")
-                optimals = run_hourly_optimisation(
-                    override=CONFIG["design"], is_nested=is_nested
+                optimals = call_optimiser(
+                    override=CONFIG["design"],
+                    optim_mode="design",
+                    target_hour=1,
+                    is_nested=is_nested,
                 )
 
                 if optimals is not None:
                     design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
 
-                    logger.debug("Operational optimisation started !")
+                    logger.info("Operational optimisation started !")
                     # print(f"Optimisation of : {override}")
                     run_hourly_optimisation(
                         override=CONFIG["operational"],
+                        optim_mode="operational",
                         static_overrides=design_dict,
                         is_nested=is_nested,
                     )
 
                 else:
-                    logger.warning("Design optimisation is not performed yet!")
+                    logger.info("Design optimisation is not performed yet!")
+        else:
+            logger.info(f"{opt_type} is not a valid optimiser!")

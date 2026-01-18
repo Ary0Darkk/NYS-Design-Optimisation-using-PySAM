@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 import mlflow
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -21,6 +22,7 @@ def make_env(
     static_overrides,
     hour_index,
     max_steps,
+    optim_mode,
 ):
     def _init():
         return SolarMixedOptimisationEnv(
@@ -31,6 +33,7 @@ def make_env(
             static_overrides=static_overrides,
             hour_index=hour_index,
             max_steps=max_steps,
+            optim_mode=optim_mode,
         )
 
     return _init
@@ -39,6 +42,7 @@ def make_env(
 @task()
 def train_rl(
     override,
+    optim_mode,
     static_overrides,
     hour_index,
     is_nested=False,
@@ -71,6 +75,7 @@ def train_rl(
                     static_overrides,
                     hour_index,
                     CONFIG["rl_max_steps"],
+                    optim_mode,
                 )
                 for _ in range(num_envs)
             ]
@@ -143,7 +148,7 @@ def train_rl(
 
         # predicts the best params using determinitic policy
         obs = env.reset()
-        best_reward = -float("inf")
+        best_reward = -np.float32("inf")
         best_params = None
 
         for _ in range(CONFIG.get("rl_eval_steps")):

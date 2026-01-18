@@ -35,15 +35,9 @@ def find_latest_downloaded_config():
 
 
 @flow(name="DEAP-GA Optimisation")
-def main(force_update: bool = False):
-    logger = get_run_logger()
-
-    if force_update:
-        logger.debug("Running optimisation with forced-update!")
-        # runs router
-        run_router.with_options(refresh_cache=True)()
-    else:
-        run_router()
+def main():
+    # runs the router
+    run_router()
 
 
 if __name__ == "__main__":
@@ -74,7 +68,7 @@ if __name__ == "__main__":
 
     try:
         # proceed with normal run using modified CONFIG
-        main(CONFIG["force_update"])
+        main()
     except KeyboardInterrupt:
         print("\nProcess interrupted by User! Shutting down workers...")
     except (httpx.ConnectError, ConnectionError) as err:

@@ -16,12 +16,12 @@ CONFIG = {
     "show_price_plot": False,
     "is_tuning": False,
     # optimiser -> choose "ga" or "fmincon" or "rl_optim"
-    "optimiser": "deap_ga",  # Initial guess
-    "route": "design",  # des-operational
+    "optimiser": "rl_optim",  # Initial guess
+    "route": "des-operational",  # des-operational
     "resume_from_checkpoint": False,
-    "force_update": False,
+    "refresh_cache": True,
     "storage_block": "s3-bucket/s3-cache",
-    "num_cores": 1000,
+    "num_cores": 4,
     # overrides
     "design": {
         "overrides": [

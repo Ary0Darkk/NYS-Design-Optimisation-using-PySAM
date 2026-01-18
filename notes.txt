@@ -104,3 +104,15 @@ For seasonlity part, I don't have to do anything really, because it will be anal
 
 2026-1-11
 I am now working on Optuna hyperparamters tuning.
+
+2026-1-17
+We are adding new terms to our objective function, below is the list of them:
+1."field_collector_tracking_power":tp.Outputs.W_dot_sca_track,
+2."pc_startup_thermal_power":tp.Outputs.q_dot_pc_startup,
+3."field_piping_thermal_loss":tp.Outputs.q_dot_piping_loss,
+4."receiver_thermal_loss":tp.Outputs.q_dot_rec_thermal_loss,
+5.Parasitic power generation-dependent load [MWe]:P_plant_balance_tot
+6.Field collector row shadowing loss:RowShadow_ave
+7.Parasitic power fixed load [MWe]:P_fixed
+8.Parasitic power condenser operation [MWe]:P_cooling_tower_tot
+9.Field collector optical end loss:EndLoss_ave

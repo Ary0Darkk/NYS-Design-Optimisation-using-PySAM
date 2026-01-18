@@ -67,7 +67,7 @@ def run_simulation(overrides: None = None):
 
     # }
 
-    sim_result = tp.export()
+    sim_result = tp.Outputs.csp_dtr_sca_ap_lengths
 
     return sim_result  # dict of outputs
 

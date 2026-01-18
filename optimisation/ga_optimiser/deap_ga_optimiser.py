@@ -48,7 +48,7 @@ def init_worker(
 # ============================================================
 # FITNESS FUNCTION (MUST BE TOP-LEVEL)
 # ============================================================
-def deap_fitness(individual, hour):
+def deap_fitness(individual, hour, optim_mode: str):
     overrides_dyn = {
         _GA_VAR_NAMES[i]: _GA_VAR_TYPES[i](individual[i])
         for i in range(len(_GA_VAR_NAMES))
@@ -56,15 +56,39 @@ def deap_fitness(individual, hour):
 
     final_overrides = {**overrides_dyn, **_GA_STATIC_OVERRIDES}
 
-    sim_result = run_simulation(final_overrides)
-
-    obj = objective_function(
-        sim_result["hourly_energy"],
-        sim_result["pc_htf_pump_power"],
-        sim_result["field_htf_pump_power"],
-        hour_index=hour,
+    sim_result = run_simulation.with_options(refresh_cache=CONFIG["refresh_cache"])(
+        final_overrides
     )
-    fitness = float(obj)
+
+    if optim_mode == "design":
+        try:
+            obj = sim_result["annual_energy"]
+            return (obj,)
+        except KeyError:
+            # This will print the ACTUAL keys being returned by the cached task
+            print(
+                f"CRITICAL: 'annual_energy' missing. Available keys: {list(sim_result.keys())}"
+            )
+            return (0.0,)  # Return a penalty score instead of crashing
+    elif optim_mode == "operational":
+        obj = objective_function(
+            sim_result["hourly_energy"],
+            sim_result["pc_htf_pump_power"],
+            sim_result["field_htf_pump_power"],
+            sim_result["field_collector_tracking_power"],
+            sim_result["pc_startup_thermal_power"],
+            sim_result["field_piping_thermal_loss"],
+            sim_result["receiver_thermal_loss"],
+            sim_result["parasitic_power_generation_dependent_load"],
+            sim_result["field_collector_row_shadowing_loss"],
+            sim_result["parasitic_power_fixed_load"],
+            sim_result["parasitic_power_condenser_operation"],
+            hour_index=hour,
+        )
+    else:
+        print(f"{optim_mode} is invalid!")
+
+    fitness = np.float32(obj)
     return (fitness,)
 
 
@@ -87,6 +111,7 @@ def evaluate_population(toolbox, population):
 @task()
 def run_deap_ga_optimisation(
     override: dict,
+    optim_mode: str,
     static_overrides: dict[str, float],
     is_nested: bool,
     curr_hour: int,
@@ -139,7 +164,9 @@ def run_deap_ga_optimisation(
             )
             toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-            toolbox.register("evaluate", partial(deap_fitness, hour=curr_hour))
+            toolbox.register(
+                "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
+            )
             toolbox.register(
                 "select",
                 tools.selTournament,
@@ -180,7 +207,9 @@ def run_deap_ga_optimisation(
             )
 
             toolbox.register("map", pool.map)
-            toolbox.register("evaluate", partial(deap_fitness, hour=curr_hour))
+            toolbox.register(
+                "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
+            )
 
             # ----------------------------
             # Stable checkpoint key

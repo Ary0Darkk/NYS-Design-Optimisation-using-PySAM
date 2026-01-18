@@ -104,9 +104,19 @@ def run_simulation(overrides):
     logger.info("Simulation finished!")
 
     sim_result = {
-        "hourly_energy": tp.Outputs.P_out_net,
+        "hourly_energy": tp.Outputs.P_out_net,  # FIXME: I think here I should take PC electrical power output : P_cycle as P_out_net is net, not gross
         "pc_htf_pump_power": tp.Outputs.cycle_htf_pump_power,
         "field_htf_pump_power": tp.Outputs.W_dot_field_pump,
+        "field_collector_tracking_power": tp.Outputs.W_dot_sca_track,
+        "pc_startup_thermal_power": tp.Outputs.q_dot_pc_startup,
+        "field_piping_thermal_loss": tp.Outputs.q_dot_piping_loss,
+        "receiver_thermal_loss": tp.Outputs.q_dot_rec_thermal_loss,
+        "parasitic_power_generation_dependent_load": tp.Outputs.P_plant_balance_tot,
+        "field_collector_row_shadowing_loss": tp.Outputs.RowShadow_ave,
+        "parasitic_power_fixed_load": tp.Outputs.P_fixed,
+        "parasitic_power_condenser_operation": tp.Outputs.P_cooling_tower_tot,
+        # NOTE: I am not taking Field collector optical end loss:EndLoss_ave for now!
+        "annual_energy": tp.Outputs.annual_energy,
     }
 
     logger.info("Outputs written to sim_result dict!")

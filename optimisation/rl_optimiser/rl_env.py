@@ -4,6 +4,7 @@ import numpy as np
 
 from simulation import run_simulation
 from objective_functions import objective_function
+from config import CONFIG
 
 
 class SolarMixedOptimisationEnv(gym.Env):
@@ -23,6 +24,7 @@ class SolarMixedOptimisationEnv(gym.Env):
         static_overrides,
         hour_index,
         max_steps,
+        optim_mode,
     ):
         super().__init__()
 
@@ -32,6 +34,7 @@ class SolarMixedOptimisationEnv(gym.Env):
         self.ub = np.array(ub, dtype=np.float32)
         self.static_overrides = static_overrides
         self.hour_index = hour_index
+        self.optim_mode = optim_mode
 
         self.action_space = spaces.Box(
             low=self.lb,
@@ -70,15 +73,37 @@ class SolarMixedOptimisationEnv(gym.Env):
         final_overrides = {**overrides_dyn, **self.static_overrides}
 
         # ---- Run simulation ----
-        sim_result = run_simulation(final_overrides)
-
-        obj = objective_function(
-            sim_result["hourly_energy"],
-            sim_result["pc_htf_pump_power"],
-            sim_result["field_htf_pump_power"],
-            hour_index=self.hour_index,
+        sim_result = run_simulation.with_options(refresh_cache=CONFIG["refresh_cache"])(
+            final_overrides
         )
 
+        if self.optim_mode == "design":
+            try:
+                obj = sim_result["annual_energy"]
+            except KeyError:
+                # This will print the ACTUAL keys being returned by the cached task
+                print(
+                    f"CRITICAL: 'annual_energy' missing. Available keys: {list(sim_result.keys())}"
+                )
+                obj = 0 # Return a penalty score instead of crashing
+        elif self.optim_mode == "operational":
+            obj = objective_function(
+                sim_result["hourly_energy"],
+                sim_result["pc_htf_pump_power"],
+                sim_result["field_htf_pump_power"],
+                sim_result["field_collector_tracking_power"],
+                sim_result["pc_startup_thermal_power"],
+                sim_result["field_piping_thermal_loss"],
+                sim_result["receiver_thermal_loss"],
+                sim_result["parasitic_power_generation_dependent_load"],
+                sim_result["field_collector_row_shadowing_loss"],
+                sim_result["parasitic_power_fixed_load"],
+                sim_result["parasitic_power_condenser_operation"],
+                hour_index=self.hour_index,
+            )
+        else:
+            print(f"{self.optim_mode} is invalid!")
+            
         reward = np.float32(obj)
 
         # TODO : Add your constraints here, refer to below example
