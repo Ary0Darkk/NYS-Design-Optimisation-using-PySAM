@@ -4,7 +4,7 @@ Global configuration file for the optimization project.
 Modify values here only — all scripts will automatically use them.
 """
 
-# FIXME: Need to find variable name for "Number of SCA per loop"
+# NOTE: Need to find variable name for "Number of SCA per loop", this variable is found on outputs section in pysam
 import os
 
 CONFIG = {
@@ -15,9 +15,9 @@ CONFIG = {
     "show_demand_plot": False,
     "show_price_plot": False,
     "is_tuning": False,
-    # optimiser -> choose "ga" or "fmincon" or "rl_optim"
-    "optimiser": "rl_optim",  # Initial guess
-    "route": "des-operational",  # des-operational
+    # optimiser -> choose "deap_ga" or "rl_optim"
+    "optimiser": "deap_ga",  # Initial guess
+    "route": "design",  # des-operational
     "resume_from_checkpoint": False,
     "refresh_cache": True,
     "storage_block": "s3-bucket/s3-cache",
@@ -33,7 +33,7 @@ CONFIG = {
             # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "lb": [5, 2, 1, 40],
+        "lb": [2, 2, 1, 40],
         "ub": [20, 10, 10, 150],
         "types": [
             float,
@@ -44,15 +44,14 @@ CONFIG = {
     },
     "operational": {
         "overrides": [
-            # "m_dot_htfmin",  # min mass-flow rate
-            # "m_dot_htfmax",  # max mass-flow rate
+            "m_dot",  # mass-flow rate
             "T_startup",  # startup temp
             "T_shutdown",  # shutdown temp
         ],
         # Bounds
-        "lb": [30, 30],
-        "ub": [100, 135],
-        "types": [float, float],
+        "lb": [2,30, 30],
+        "ub": [12,100, 135],
+        "types": [int,float, float],
     },
     # deap-ga optimisation settings
     "random_seed": 33,

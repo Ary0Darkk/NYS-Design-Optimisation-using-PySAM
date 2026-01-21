@@ -151,7 +151,7 @@ def run_router():
 
     if CONFIG.get("is_tuning", False):
         # set experiment name
-        mlflow.set_experiment(f"rl-tuning")
+        mlflow.set_experiment("rl-tuning")
 
         call_tuner(override=CONFIG["design"])
     else:
@@ -179,12 +179,15 @@ def run_router():
             )
 
         elif override == "operational":
-            logger.info(f"{CONFIG['route']} optimisation started !")
-            run_hourly_optimisation(
-                override=CONFIG["operational"],
-                optim_mode="operational",
-                is_nested=False,
-            )
+            is_nested=True
+
+            with mlflow.start_run(run_name="Operational optimisation"):
+                logger.info(f"{CONFIG['route']} optimisation started !")
+                run_hourly_optimisation(
+                    override=CONFIG["operational"],
+                    optim_mode="operational",
+                    is_nested=is_nested,
+                )
         # perform both optim in sequence
         elif override == "design_operational":
             is_nested = True  # informs mlflow for multi-step run

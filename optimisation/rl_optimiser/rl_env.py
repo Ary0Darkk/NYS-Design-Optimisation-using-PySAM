@@ -30,8 +30,8 @@ class SolarMixedOptimisationEnv(gym.Env):
 
         self.var_names = var_names
         self.var_types = var_types
-        self.lb = np.array(lb, dtype=np.float32)
-        self.ub = np.array(ub, dtype=np.float32)
+        self.lb = np.array(lb, dtype=np.float16)
+        self.ub = np.array(ub, dtype=np.float16)
         self.static_overrides = static_overrides
         self.hour_index = hour_index
         self.optim_mode = optim_mode
@@ -39,7 +39,7 @@ class SolarMixedOptimisationEnv(gym.Env):
         self.action_space = spaces.Box(
             low=self.lb,
             high=self.ub,
-            dtype=np.float32,
+            dtype=np.float16,
         )
 
         self.observation_space = self.action_space
@@ -51,7 +51,7 @@ class SolarMixedOptimisationEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_step = 0
-        self.state = self.action_space.sample()
+        self.state = self.np_random.uniform(low=self.lb, high=self.ub)      # initialise from some random value for exploration
         # self.state = np.zeros_like(self.action_space.low)
         return self.state, {}
 
@@ -64,7 +64,7 @@ class SolarMixedOptimisationEnv(gym.Env):
             val = action[i]
             if self.var_types[i] is int:
                 val = int(round(val))
-            val = max(self.lb[i], min(self.ub[i], val))
+            val = (max(self.lb[i], min(self.ub[i], val)))     
             overrides_dyn[name] = self.var_types[i](
                 val
             )  # type casting self.var_types[i] -> int or float then (val) type cast val into that type
@@ -85,7 +85,7 @@ class SolarMixedOptimisationEnv(gym.Env):
                 print(
                     f"CRITICAL: 'annual_energy' missing. Available keys: {list(sim_result.keys())}"
                 )
-                obj = 0 # Return a penalty score instead of crashing
+                obj = 0  # Return a penalty score instead of crashing
         elif self.optim_mode == "operational":
             obj = objective_function(
                 sim_result["hourly_energy"],
@@ -103,7 +103,7 @@ class SolarMixedOptimisationEnv(gym.Env):
             )
         else:
             print(f"{self.optim_mode} is invalid!")
-            
+
         reward = np.float32(obj)
 
         # TODO : Add your constraints here, refer to below example
@@ -118,7 +118,8 @@ class SolarMixedOptimisationEnv(gym.Env):
         # Optional: End the episode early if the constraint is critical
         # done = True
 
-        self.state = np.array(list(overrides_dyn.values()), dtype=np.float32)
+        self.state = np.array(list(overrides_dyn.values()),dtype=np.float16)    # setting dtype to object maintains the exact precision
+        # print(self.state.dtype)
 
         # ---- max steps limit ----
         terminated = False

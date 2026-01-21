@@ -1,6 +1,7 @@
 import json
 import PySAM.TroughPhysical as TP
 import hashlib
+import pprint
 
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
@@ -25,7 +26,7 @@ def canonicalize_overrides(overrides):
                 k,
                 int(v)
                 if isinstance(v, bool) or float(v).is_integer()
-                else round(float(v), 6),
+                else round(float(v), 2),
             )
             for k, v in overrides.items()
         )
@@ -44,10 +45,20 @@ def simulation_cache_key(context, parameters):
     cache_expiration=timedelta(days=30),
     result_storage=CONFIG["storage_block"],
 )
-def run_simulation(overrides):
+def run_simulation(overrides:dict):
     logger = get_run_logger()
 
     overrides = dict(overrides)
+
+    # handle mass flow rate values
+    for key,value in overrides.items():
+        if key == "m_dot":
+            overrides["m_dot_htfmin"] = value
+            overrides["m_dot_htfmax"] = value
+            del overrides["m_dot"]
+            break
+
+    logger.info(f'Current paramters : {overrides}')
 
     tp = TP.default(CONFIG["model"])
     logger.info(f"{CONFIG['model']} model loaded!")

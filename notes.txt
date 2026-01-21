@@ -116,3 +116,6 @@ We are adding new terms to our objective function, below is the list of them:
 7.Parasitic power fixed load [MWe]:P_fixed
 8.Parasitic power condenser operation [MWe]:P_cooling_tower_tot
 9.Field collector optical end loss:EndLoss_ave
+
+2026-1-21
+currently I am facing problem of floating point precision, because if I am take a higher precision, my search space is going to blow up. So I need to make lower precision enough so that I can handle search space enough.

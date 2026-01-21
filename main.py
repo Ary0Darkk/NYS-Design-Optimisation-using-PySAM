@@ -7,7 +7,6 @@ from config import CONFIG
 from router import run_router
 
 from prefect import flow
-from prefect.logging import get_run_logger
 
 
 def load_repro_config(path):
@@ -34,7 +33,7 @@ def find_latest_downloaded_config():
     return files[0]
 
 
-@flow(name="DEAP-GA Optimisation")
+@flow(name="NYS-Optimisation")
 def main():
     # runs the router
     run_router()

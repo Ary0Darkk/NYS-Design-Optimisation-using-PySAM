@@ -50,24 +50,89 @@ def train_rl(
     is_tuning=False,  # flag to change behavior
     trial=None,  # Optuna Trial object
 ):
-    var_names = override["overrides"]
-    var_types = override["types"]
-    lb, ub = override["lb"], override["ub"]
+    try:
 
-    run_name = f"RL_hour_{hour_index}"
+        if optim_mode=="design":
+            run_name = "RL_Design_optimisation"
+        else:
+            run_name = f"RL_hour_{hour_index}"
 
-    if mlflow.active_run() and not is_nested:
-        mlflow.end_run()
+        if mlflow.active_run() and not is_nested:
+            mlflow.end_run()
 
-    with mlflow.start_run(run_name=run_name, nested=is_nested):
-        mlflow.set_tag("optimiser", "PPO")
-        mlflow.set_tag("hour", hour_index)
+        with mlflow.start_run(run_name=run_name, nested=is_nested):
+            mlflow.set_tag("Author", CONFIG["author"])
+            mlflow.set_tag("optimiser", "PPO")
+            mlflow.log_artifact("config.py")
+            mlflow.set_tag("hour", hour_index)
 
-        num_envs = min(4, multiprocessing.cpu_count())  # use physical cores
+            var_names = override["overrides"]
+            var_types = override["types"]
+            lb, ub = override["lb"], override["ub"]
 
-        env = SubprocVecEnv(
-            [
-                make_env(
+            num_envs = min(4, multiprocessing.cpu_count())  # use physical cores
+
+            env = SubprocVecEnv(
+                [
+                    make_env(
+                        var_names,
+                        var_types,
+                        lb,
+                        ub,
+                        static_overrides,
+                        hour_index,
+                        CONFIG["rl_max_steps"],
+                        optim_mode,
+                    )
+                    for _ in range(num_envs)
+                ]
+            )
+
+            # ---- Checkpoint directory ----
+            ckpt_dir = Path("checkpoints") / "rl" / f"hour_{hour_index}"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+            model_path = ckpt_dir / "ppo_latest.zip"
+
+            # ---- Handle Hyperparameters ----
+            # We prioritize Optuna, then fallback to CONFIG, then fallback to SB3 defaults
+            hp = tuned_hyperparams or {}
+
+            def get_val(key, default):
+                # checks Optuna trial, global CONFIG, Hardcoded fallback
+                return hp.get(key, CONFIG.get(f"rl_{key}", default))
+
+            # ---- Resume or fresh ----
+            if model_path.exists() and CONFIG.get("resume_from_checkpoint", False):
+                model = PPO.load(model_path, env=env)
+            else:
+                model = PPO(
+                    "MlpPolicy",
+                    env,
+                    learning_rate=get_val("learning_rate", 3e-4),
+                    n_steps=get_val("n_steps", 20),
+                    batch_size=get_val("batch_size", 10),
+                    ent_coef=get_val("ent_coef", 0.01),
+                    gamma=get_val("gamma", 0.99),
+                    n_epochs=10,
+                    gae_lambda=0.95,
+                    clip_range=0.2,
+                    device="cpu",  # available
+                    verbose=1,
+                    seed=CONFIG.get("random_seed", 21),
+                )
+
+            checkpoint_cb = CheckpointCallback(
+                save_freq=CONFIG.get("rl_checkpoint_freq", 10),
+                save_path=str(ckpt_dir),
+                name_prefix="ppo",
+            )
+
+            # ---- Add Pruning Callback ----
+            callbacks = [checkpoint_cb]
+            if is_tuning and trial:
+                # This allows Optuna to kill bad trials early
+                eval_env = make_env(
                     var_names,
                     var_types,
                     lb,
@@ -75,117 +140,70 @@ def train_rl(
                     static_overrides,
                     hour_index,
                     CONFIG["rl_max_steps"],
-                    optim_mode,
-                )
-                for _ in range(num_envs)
-            ]
-        )
+                )()
+                # This is the custom class we discussed that reports back to 'trial'
+                tuning_cb = TrialEvalCallback(eval_env, trial, eval_freq=20)
+                callbacks.append(tuning_cb)
 
-        # ---- Checkpoint directory ----
-        ckpt_dir = Path("checkpoints") / "rl" / f"hour_{hour_index}"
-        ckpt_dir.mkdir(parents=True, exist_ok=True)
+            total_timesteps = CONFIG.get("rl_timesteps", 2)
 
-        model_path = ckpt_dir / "ppo_latest.zip"
-
-        # ---- Handle Hyperparameters ----
-        # We prioritize Optuna, then fallback to CONFIG, then fallback to SB3 defaults
-        hp = tuned_hyperparams or {}
-
-        def get_val(key, default):
-            # checks Optuna trial, global CONFIG, Hardcoded fallback
-            return hp.get(key, CONFIG.get(f"rl_{key}", default))
-
-        # ---- Resume or fresh ----
-        if model_path.exists() and CONFIG.get("resume_from_checkpoint", False):
-            model = PPO.load(model_path, env=env)
-        else:
-            model = PPO(
-                "MlpPolicy",
-                env,
-                learning_rate=get_val("learning_rate", 3e-4),
-                n_steps=get_val("n_steps", 20),
-                batch_size=get_val("batch_size", 10),
-                ent_coef=get_val("ent_coef", 0.01),
-                gamma=get_val("gamma", 0.99),
-                n_epochs=10,
-                gae_lambda=0.95,
-                clip_range=0.2,
-                device="cpu",  # available
-                verbose=1,
-                seed=CONFIG.get("random_seed", 21),
+            print("PPO device:", model.policy.device)
+            model.learn(
+                total_timesteps=total_timesteps,
+                callback=checkpoint_cb,
             )
 
-        checkpoint_cb = CheckpointCallback(
-            save_freq=CONFIG.get("rl_checkpoint_freq", 10),
-            save_path=str(ckpt_dir),
-            name_prefix="ppo",
-        )
+            # predicts the best params using determinitic policy
+            obs = env.reset()
+            best_reward = -np.float32("inf")
+            best_params = None
 
-        # ---- Add Pruning Callback ----
-        callbacks = [checkpoint_cb]
-        if is_tuning and trial:
-            # This allows Optuna to kill bad trials early
-            eval_env = make_env(
-                var_names,
-                var_types,
-                lb,
-                ub,
-                static_overrides,
-                hour_index,
-                CONFIG["rl_max_steps"],
-            )()
-            # This is the custom class we discussed that reports back to 'trial'
-            tuning_cb = TrialEvalCallback(eval_env, trial, eval_freq=20)
-            callbacks.append(tuning_cb)
+            for _ in range(CONFIG.get("rl_eval_steps")):
+                action, _ = model.predict(obs, deterministic=True)
+                obs, rewards, dones, infos = env.step(action)
 
-        total_timesteps = CONFIG.get("rl_timesteps", 2)
+                max_idx = rewards.argmax()
 
-        print("PPO device:", model.policy.device)
-        model.learn(
-            total_timesteps=total_timesteps,
-            callback=checkpoint_cb,
-        )
+                if rewards[max_idx] > best_reward:
+                    best_reward = rewards[max_idx]
+                    best_params = infos[max_idx]["overrides"]
 
-        # predicts the best params using determinitic policy
-        obs = env.reset()
-        best_reward = -np.float32("inf")
-        best_params = None
+                if dones.any():
+                    obs = env.reset()
 
-        for _ in range(CONFIG.get("rl_eval_steps")):
-            action, _ = model.predict(obs, deterministic=True)
-            obs, rewards, dones, infos = env.step(action)
+            print("\n" + "-" * 40)
+            if optim_mode == "design":
+                print("RL Design Optimal solutions")
+            else:
+                print(f"RL Optimal solution (hour {hour_index})")
+            print("-" * 40)
+            for k, v in best_params.items():
+                print(f"{k:20}: {v}")
+            print("-" * 40)
+            print(f"Best reward: {best_reward:.6f}")
+            print("-" * 40)
 
-            max_idx = rewards.argmax()
+            mlflow.log_metric("best_reward",best_reward)
+            for k, v in best_params.items():
+                mlflow.log_param(f"opt_{k}", v)
 
-            if rewards[max_idx] > best_reward:
-                best_reward = rewards[max_idx]
-                best_params = infos[max_idx]["overrides"]
+            model.save(model_path)
 
-            if dones.any():
-                obs = env.reset()
+            # ---- Log artifacts ----
+            mlflow.log_artifact(str(model_path))
+            mlflow.log_params(
+                {
+                    "timesteps": total_timesteps,
+                    "learning_rate": model.learning_rate,
+                }
+            )
 
-        print("\n" + "-" * 40)
-        print(f"RL Optimal solution (hour {hour_index})")
-        print("-" * 40)
-        for k, v in best_params.items():
-            print(f"{k:20}: {v}")
-        print("-" * 40)
-        print(f"Best reward: {best_reward:.6f}")
-        print("-" * 40)
+            return best_params, best_reward, total_timesteps
+    except KeyboardInterrupt:
+        print("Interrupted by User!\nStopping...")
 
-        mlflow.log_metrics({"best_reward": best_reward})
-        for k, v in best_params.items():
-            mlflow.log_param(f"opt_{k}", v)
+    finally:
+        # close worker pool
+        print('Closing worker pool...')
+        env.close()
 
-        model.save(model_path)
-
-        # ---- Log artifacts ----
-        mlflow.log_artifact(str(model_path))
-        mlflow.log_params(
-            {
-                "timesteps": total_timesteps,
-                "learning_rate": model.learning_rate,
-            }
-        )
-
-        return best_params, best_reward, model

@@ -4,12 +4,10 @@ import mlflow
 from deap import base, creator, tools, algorithms
 
 import multiprocessing as mp
-from functools import partial
 
 from prefect import task
 from prefect.logging import get_run_logger
 
-from simulation import run_simulation
 from config import CONFIG
 
 # individual creation

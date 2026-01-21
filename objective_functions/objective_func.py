@@ -31,16 +31,16 @@ def objective_function(
     # convert them into df
     data = {
         "hourly_energy": hourly_energy,
-        "field_htf_pump_power": field_htf_pump_power,
-        "pc_htf_pump_power": pc_htf_pump_power,
-        "field_collector_tracking_power": field_collector_tracking_power,
-        "pc_startup_thermal_power": pc_startup_thermal_power,
-        "field_piping_thermal_loss": field_piping_thermal_loss,
-        "receiver_thermal_loss": receiver_thermal_loss,
-        "parasitic_power_generation_dependent_load": parasitic_power_generation_dependent_load,
-        "field_collector_row_shadowing_loss": field_collector_row_shadowing_loss,
-        "parasitic_power_fixed_load": parasitic_power_fixed_load,
-        "parasitic_power_condenser_operation": parasitic_power_condenser_operation,
+        "field_htf_pump_power": field_htf_pump_power,  # MWe
+        "pc_htf_pump_power": pc_htf_pump_power,  # MWe
+        "field_collector_tracking_power": field_collector_tracking_power,  # MWe
+        "pc_startup_thermal_power": pc_startup_thermal_power,  # MWt
+        "field_piping_thermal_loss": field_piping_thermal_loss,  # MWt
+        "receiver_thermal_loss": receiver_thermal_loss,  # MWt
+        "parasitic_power_generation_dependent_load": parasitic_power_generation_dependent_load,  # MWe
+        "field_collector_row_shadowing_loss": field_collector_row_shadowing_loss,  # fraction
+        "parasitic_power_fixed_load": parasitic_power_fixed_load,  # MWe
+        "parasitic_power_condenser_operation": parasitic_power_condenser_operation,  # MWe
         "dynamic_price": get_dynamic_price()["dynamic_price"].values,
     }
 

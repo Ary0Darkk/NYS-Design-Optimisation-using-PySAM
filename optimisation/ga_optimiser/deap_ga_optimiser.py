@@ -119,12 +119,18 @@ def run_deap_ga_optimisation(
     try:
         logger = get_run_logger()
 
+        if optim_mode=="design":
+            run_name = "GA_Design_optimisation"
+        else:
+            run_name = f"GA_hour_{curr_hour}"
+
         if mlflow.active_run() and not is_nested:
             mlflow.end_run()
 
-        with mlflow.start_run(run_name=f"GA_hour_{curr_hour}", nested=is_nested):
+        with mlflow.start_run(run_name=run_name, nested=is_nested):
             mlflow.set_tag("Author", CONFIG["author"])
             mlflow.log_artifact("config.py")
+            mlflow.set_tag("hour", curr_hour)
 
             # ----------------------------
             # Read configuration
@@ -339,7 +345,11 @@ def run_deap_ga_optimisation(
             res_dict = {}
             if CONFIG.get("verbose", True):
                 print("\n" + "-" * 40)
-                print(f"Results for hour = {curr_hour}")
+                if optim_mode == "design":
+                    print("GA Design Optimal solutions")
+                else:
+                    print(f"GA Optimal solution (hour {curr_hour})")
+                # print(f"Results for hour = {curr_hour}")
                 res_dict["hour"] = curr_hour
                 print("\n" + "-" * 40)
                 print("Final Best Solutions")
@@ -368,7 +378,7 @@ def run_deap_ga_optimisation(
 
             result_logbook = result_logbook.set_index("hour")
 
-            file_name = Path(f"results/result_1.csv")
+            file_name = Path("results/result_1.csv")
             file_name.parent.mkdir(exist_ok=True)
 
             file_exists = file_name.exists()
