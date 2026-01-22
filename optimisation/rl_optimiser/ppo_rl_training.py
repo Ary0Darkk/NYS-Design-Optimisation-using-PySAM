@@ -175,23 +175,34 @@ def train_rl(
             print("\n" + "-" * 40)
             if optim_mode == "design":
                 print("RL Design Optimal solutions")
+                print("-" * 40)
+                for k, v in best_params.items():
+                    res_dict[k] = v
+                    print(f"{k:20}: {v}")
+                print("-" * 40)
+                print(f"Best reward: {best_reward:.6f}")
+                print("-" * 40)
+                res_dict["best_reward"] = best_reward
             else:
                 print(f"RL Optimal solution (hour {hour_index})")
                 res_dict["hour"] = hour_index
-            print("-" * 40)
-            for k, v in best_params.items():
-                res_dict[k] = v
-                print(f"{k:20}: {v}")
-            print("-" * 40)
-            print(f"Best reward: {best_reward:.6f}")
-            print("-" * 40)
-            res_dict["best_reward"] = best_reward
+                print("-" * 40)
+                for k, v in best_params.items():
+                    res_dict[k] = v
+                    print(f"{k:20}: {v}")
+                print("-" * 40)
+                print(f"Best reward: {best_reward:.6f}")
+                print("-" * 40)
+                res_dict["best_reward"] = best_reward
 
             result_logbook = pd.DataFrame([res_dict])
+            result_logbook.index = result_logbook.index + 1
+            result_logbook.index.name = "serial"
 
-            result_logbook = result_logbook.set_index("hour")
-
-            file_name = Path("results/RL_results.csv")
+            if optim_mode == "design":
+                file_name = Path("results/RL_design_results.csv")
+            else:
+                file_name = Path("results/RL_operational_results.csv")
             file_name.parent.mkdir(exist_ok=True)
 
             file_exists = file_name.exists()
