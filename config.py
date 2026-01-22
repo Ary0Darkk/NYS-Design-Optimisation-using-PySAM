@@ -16,7 +16,7 @@ CONFIG = {
     "show_price_plot": False,
     "is_tuning": False,
     # optimiser -> choose "deap_ga" or "rl_optim"
-    "optimiser": "deap_ga",  # Initial guess
+    "optimiser": "rl_optim",  # Initial guess
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
     "refresh_cache": True,
@@ -49,9 +49,9 @@ CONFIG = {
             "T_shutdown",  # shutdown temp
         ],
         # Bounds
-        "lb": [2,30, 30],
-        "ub": [12,100, 135],
-        "types": [int,float, float],
+        "lb": [2, 30, 30],
+        "ub": [12, 100, 135],
+        "types": [int, float, float],
     },
     # deap-ga optimisation settings
     "random_seed": 33,

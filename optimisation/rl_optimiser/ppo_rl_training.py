@@ -5,6 +5,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from prefect import task
+import pandas as pd
 
 import multiprocessing
 
@@ -51,8 +52,7 @@ def train_rl(
     trial=None,  # Optuna Trial object
 ):
     try:
-
-        if optim_mode=="design":
+        if optim_mode == "design":
             run_name = "RL_Design_optimisation"
         else:
             run_name = f"RL_hour_{hour_index}"
@@ -171,19 +171,33 @@ def train_rl(
                 if dones.any():
                     obs = env.reset()
 
+            res_dict = {}
             print("\n" + "-" * 40)
             if optim_mode == "design":
                 print("RL Design Optimal solutions")
             else:
                 print(f"RL Optimal solution (hour {hour_index})")
+                res_dict["hour"] = hour_index
             print("-" * 40)
             for k, v in best_params.items():
+                res_dict[k] = v
                 print(f"{k:20}: {v}")
             print("-" * 40)
             print(f"Best reward: {best_reward:.6f}")
             print("-" * 40)
+            res_dict["best_reward"] = best_reward
 
-            mlflow.log_metric("best_reward",best_reward)
+            result_logbook = pd.DataFrame([res_dict])
+
+            result_logbook = result_logbook.set_index("hour")
+
+            file_name = Path("results/RL_results.csv")
+            file_name.parent.mkdir(exist_ok=True)
+
+            file_exists = file_name.exists()
+            result_logbook.to_csv(file_name, mode="a", header=not file_exists)
+
+            mlflow.log_metric("best_reward", best_reward)
             for k, v in best_params.items():
                 mlflow.log_param(f"opt_{k}", v)
 
@@ -204,6 +218,5 @@ def train_rl(
 
     finally:
         # close worker pool
-        print('Closing worker pool...')
+        print("Closing worker pool...")
         env.close()
-

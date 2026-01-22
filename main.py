@@ -2,6 +2,7 @@ import os
 import argparse
 import glob
 import httpx
+from functools import partial
 
 from config import CONFIG
 from router import run_router
@@ -33,7 +34,15 @@ def find_latest_downloaded_config():
     return files[0]
 
 
-@flow(name="NYS-Optimisation")
+def graceful_shutdown(reason: str):
+    print(f"Program {reason}!")
+
+
+@flow(
+    name="NYS-Optimisation",
+    on_cancellation=[partial(graceful_shutdown, reason="cancelled")],
+    on_crashed=[partial(graceful_shutdown, reason="failed")],
+)
 def main():
     # runs the router
     run_router()

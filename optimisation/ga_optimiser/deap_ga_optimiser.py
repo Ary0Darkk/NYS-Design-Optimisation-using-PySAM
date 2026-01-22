@@ -79,10 +79,6 @@ def deap_fitness(individual, hour, optim_mode: str):
             sim_result["pc_startup_thermal_power"],
             sim_result["field_piping_thermal_loss"],
             sim_result["receiver_thermal_loss"],
-            sim_result["parasitic_power_generation_dependent_load"],
-            sim_result["field_collector_row_shadowing_loss"],
-            sim_result["parasitic_power_fixed_load"],
-            sim_result["parasitic_power_condenser_operation"],
             hour_index=hour,
         )
     else:
@@ -119,7 +115,7 @@ def run_deap_ga_optimisation(
     try:
         logger = get_run_logger()
 
-        if optim_mode=="design":
+        if optim_mode == "design":
             run_name = "GA_Design_optimisation"
         else:
             run_name = f"GA_hour_{curr_hour}"
@@ -343,33 +339,32 @@ def run_deap_ga_optimisation(
             # Pretty console output (same style as your original code)
             # ----------------------------
             res_dict = {}
-            if CONFIG.get("verbose", True):
-                print("\n" + "-" * 40)
-                if optim_mode == "design":
-                    print("GA Design Optimal solutions")
-                else:
-                    print(f"GA Optimal solution (hour {curr_hour})")
+            print("\n" + "-" * 40)
+            if optim_mode == "design":
+                print("GA Design Optimal solutions")
+            else:
+                print(f"GA Optimal solution (hour {curr_hour})")
                 # print(f"Results for hour = {curr_hour}")
                 res_dict["hour"] = curr_hour
-                print("\n" + "-" * 40)
-                print("Final Best Solutions")
-                print("-" * 40)
+            print("\n" + "-" * 40)
+            print("Final Best Solutions")
+            print("-" * 40)
 
-                for i, name in enumerate(var_names):
-                    val = best_solution[i]
+            for i, name in enumerate(var_names):
+                val = best_solution[i]
 
-                    res_dict[name] = val  # stores in dict to save data in csv
-                    # Match formatting you used earlier
-                    if isinstance(val, float):
-                        print(f"  {name:20}: {val:.4f}")
-                    else:
-                        print(f"  {name:20}: {val}")
+                res_dict[name] = val  # stores in dict to save data in csv
+                # Match formatting you used earlier
+                if isinstance(val, float):
+                    print(f"  {name:20}: {val:.4f}")
+                else:
+                    print(f"  {name:20}: {val}")
 
-                print("-" * 40)
-                print(f"{'Best Fitness':20}: {best_fitness:.6f}")
-                print("-" * 40)
+            print("-" * 40)
+            print(f"{'Best Fitness':20}: {best_fitness:.6f}")
+            print("-" * 40)
 
-                res_dict["best_fitness"] = best_fitness
+            res_dict["best_fitness"] = best_fitness
 
             logger.info(f"Best solution: {best_solution}")
             logger.info(f"Best fitness: {best_fitness}")
@@ -378,7 +373,7 @@ def run_deap_ga_optimisation(
 
             result_logbook = result_logbook.set_index("hour")
 
-            file_name = Path("results/result_1.csv")
+            file_name = Path("results/GA_result.csv")
             file_name.parent.mkdir(exist_ok=True)
 
             file_exists = file_name.exists()

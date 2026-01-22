@@ -179,7 +179,7 @@ def run_router():
             )
 
         elif override == "operational":
-            is_nested=True
+            is_nested = True
 
             with mlflow.start_run(run_name="Operational optimisation"):
                 logger.info(f"{CONFIG['route']} optimisation started !")

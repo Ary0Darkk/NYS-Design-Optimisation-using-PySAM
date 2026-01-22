@@ -25,4 +25,5 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "ruff>=0.14.9",
     "stable-baselines3>=2.7.1",
+    "trackio>=0.15.0",
 ]

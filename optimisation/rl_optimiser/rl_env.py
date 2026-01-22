@@ -51,7 +51,9 @@ class SolarMixedOptimisationEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_step = 0
-        self.state = self.np_random.uniform(low=self.lb, high=self.ub)      # initialise from some random value for exploration
+        self.state = self.np_random.uniform(
+            low=self.lb, high=self.ub
+        )  # initialise from some random value for exploration
         # self.state = np.zeros_like(self.action_space.low)
         return self.state, {}
 
@@ -64,7 +66,7 @@ class SolarMixedOptimisationEnv(gym.Env):
             val = action[i]
             if self.var_types[i] is int:
                 val = int(round(val))
-            val = (max(self.lb[i], min(self.ub[i], val)))     
+            val = max(self.lb[i], min(self.ub[i], val))
             overrides_dyn[name] = self.var_types[i](
                 val
             )  # type casting self.var_types[i] -> int or float then (val) type cast val into that type
@@ -95,10 +97,6 @@ class SolarMixedOptimisationEnv(gym.Env):
                 sim_result["pc_startup_thermal_power"],
                 sim_result["field_piping_thermal_loss"],
                 sim_result["receiver_thermal_loss"],
-                sim_result["parasitic_power_generation_dependent_load"],
-                sim_result["field_collector_row_shadowing_loss"],
-                sim_result["parasitic_power_fixed_load"],
-                sim_result["parasitic_power_condenser_operation"],
                 hour_index=self.hour_index,
             )
         else:
@@ -118,7 +116,9 @@ class SolarMixedOptimisationEnv(gym.Env):
         # Optional: End the episode early if the constraint is critical
         # done = True
 
-        self.state = np.array(list(overrides_dyn.values()),dtype=np.float16)    # setting dtype to object maintains the exact precision
+        self.state = np.array(
+            list(overrides_dyn.values()), dtype=np.float16
+        )  # setting dtype to object maintains the exact precision
         # print(self.state.dtype)
 
         # ---- max steps limit ----
