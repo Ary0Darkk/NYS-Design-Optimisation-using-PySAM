@@ -1,9 +1,5 @@
-import os
-import argparse
-import glob
 import httpx
 
-from config import CONFIG
 from router import run_router
 from utilities.setup_custom_logger import setup_custom_logger
 

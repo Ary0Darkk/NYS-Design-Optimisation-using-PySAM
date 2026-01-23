@@ -17,7 +17,7 @@ CONFIG = {
     "is_tuning": False,
     # optimiser -> choose "deap_ga" or "rl_optim"
     "optimiser": "rl_optim",  # Initial guess
-    "route": "design",  # des-operational
+    "route": "des-operational",  # des-operational
     "resume_from_checkpoint": False,
     "refresh_cache": True,
     "storage_block": "local-file-system/local-storage",
@@ -58,17 +58,17 @@ CONFIG = {
     "tournament_size": 2,
     "mutation_num_genes": 5,
     "sol_per_pop": 4,
-    "num_generations": 8,
+    "num_generations": 1,
     "cxpb": 0.8,
     "mutpb": 0.2,
     "indpb": 0.2,
     "verbose": True,
     # rl-based optimisation settings
-    "rl_max_steps": 5,
-    "rl_eval_steps": 10,
-    "rl_lr": 3e-2,
-    "rl_checkpoint_freq": 20,
-    "rl_timesteps": 20,
+    "rl_max_steps": 3,
+    "rl_eval_steps": 2,
+    "rl_lr": 3e-1,
+    "rl_checkpoint_freq": 10,
+    "rl_timesteps": 10,
     # nlopt-fmincon settings
     "nlopt_algorithm": "LD_SLSQP",
     "maxeval": 3,

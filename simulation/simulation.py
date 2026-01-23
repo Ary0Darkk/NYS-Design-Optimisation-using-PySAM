@@ -1,7 +1,7 @@
 import json
-import json
 import PySAM.TroughPhysical as TP
 import hashlib
+import tabulate as tb
 
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
@@ -54,7 +54,6 @@ def run_simulation(overrides: dict):
             overrides["m_dot_htfmax"] = value
             del overrides["m_dot"]
             break
-
 
     tp = TP.default(CONFIG["model"])
     # logger.info(f"{CONFIG['model']} model loaded!")
@@ -126,6 +125,7 @@ def run_simulation(overrides: dict):
         "annual_energy": tp.Outputs.annual_energy,
     }
 
-    logger.info(f"Ran sim with paramters : {overrides}")
+    table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
+    logger.info(f"Ran sim with paramters :\n{table}")
     # logger.info("Outputs written to sim_result dict!")
     return sim_result  # dict of outputs

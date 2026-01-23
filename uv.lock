@@ -2655,6 +2655,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "ruff" },
     { name = "stable-baselines3" },
+    { name = "tabulate" },
     { name = "trackio" },
 ]
 
@@ -2675,6 +2676,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "ruff", specifier = ">=0.14.9" },
     { name = "stable-baselines3", specifier = ">=2.7.1" },
+    { name = "tabulate", specifier = ">=0.9.0" },
     { name = "trackio", specifier = ">=0.15.0" },
 ]
 

@@ -1,21 +1,22 @@
 import logging
 import sys
 import os
+import multiprocessing
 from datetime import datetime
 
 # These are the actual codes the terminal understands
-BLUE   = "\033[94m"
-CYAN   = "\033[96m"
-MAGNETA= "\033[95m"
-GREEN  = "\033[92m"
+BLUE = "\033[94m"
+CYAN = "\033[96m"
+MAGNETA = "\033[95m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-RED    = "\033[91m"
-BOLD   = "\033[1m"
-RESET  = "\033[0m"
-LIGHT_GRAY="\033[2m"
+RED = "\033[91m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+LIGHT_GRAY = "\033[2m"
 
 
-def setup_custom_logger(name="NYS_Optimisation", log_folder="logs",existing_file=None):
+def setup_custom_logger(name="NYS_Optimisation", log_folder="logs", existing_file=None):
     """Sets up a logger that outputs to both console and a timestamped file."""
 
     # Create logs directory if it doesn't exist
@@ -26,7 +27,9 @@ def setup_custom_logger(name="NYS_Optimisation", log_folder="logs",existing_file
     if existing_file:
         log_file = existing_file
     else:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M") # Removed seconds for stability
+        timestamp = datetime.now().strftime(
+            "%Y-%m-%d_%H-%M"
+        )  # Removed seconds for stability
         log_file = os.path.join(log_folder, f"{name}_{timestamp}.log")
 
     # create a master logger
@@ -61,7 +64,8 @@ def setup_custom_logger(name="NYS_Optimisation", log_folder="logs",existing_file
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    logger.info(f"Logger initialized. Writing to: {log_file}")
+    if multiprocessing.current_process().name == "MainProcess":
+        logger.info(f"Logger initialized. Writing to: {log_file}")
     return logger
 
 

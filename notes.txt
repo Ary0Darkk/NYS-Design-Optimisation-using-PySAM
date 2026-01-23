@@ -122,3 +122,18 @@ currently I am facing problem of floating point precision, because if I am take 
 
 2026-1-23
 I think I need to remove this logging to local device, because it is a bottleneck to send and retrieve files from there. Essentially not providing marginal gain in time reduction. So remove saving to aws-S3 and probably use prefect to save its log on local machine only.
+
+And also I think I need to switch to trackio, because trackio can work better for us, as it is local-first, and help with 100s of simulation logs, atleast what they are selling for. It can also provide real-time plot of metrices, that's a good thing.
+
+Our final objective function becomes now:
+obj = (
+        hourly_energy_term  # gross term followed by other penality terms
+        - field_htf_pump_power_term
+        - pc_htf_pump_power_term
+        - field_collector_tracking_power_term
+        - pc_startup_thermal_power_term
+        - field_piping_thermal_loss_term
+        - receiver_thermal_loss_term
+    )
+
+Also I need to see checkpointing is happening regularly or not.Look for simulation caching too!

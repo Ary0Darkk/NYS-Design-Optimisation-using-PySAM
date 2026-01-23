@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import tabulate as tb
 import mlflow
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -174,28 +175,36 @@ def train_rl(
                     obs = env.reset()
 
             res_dict = {}
-            print("\n" + "-" * 40)
+            header_line = "-" * 40
             if optim_mode == "design":
-                print("RL Design Optimal solutions")
-                print("-" * 40)
                 for k, v in best_params.items():
                     res_dict[k] = v
-                    print(f"{k:20}: {v}")
-                print("-" * 40)
-                print(f"Best reward: {best_reward:.6f}")
-                print("-" * 40)
                 res_dict["best_reward"] = best_reward
+
+                #    formats output
+                res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
+                logger.info(
+                    f"\n{header_line}\n"
+                    f"RL DESIGN OPTIMAL SOLUTIONS\n"
+                    f"{header_line}\n"
+                    f"Final Best Results\n"
+                    f"{res_table}"
+                )
             else:
-                print(f"RL Optimal solution (hour {hour_index})")
                 res_dict["hour"] = hour_index
-                print("-" * 40)
                 for k, v in best_params.items():
                     res_dict[k] = v
-                    print(f"{k:20}: {v}")
-                print("-" * 40)
-                print(f"Best reward: {best_reward:.6f}")
-                print("-" * 40)
                 res_dict["best_reward"] = best_reward
+
+                # formats output
+                res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
+                logger.info(
+                    f"\n{header_line}\n"
+                    f"RL Optimal solution (hour {hour_index})\n"
+                    f"{header_line}\n"
+                    f"Final Best Results\n"
+                    f"{res_table}"
+                )
 
             result_logbook = pd.DataFrame([res_dict])
             result_logbook.index = result_logbook.index + 1
@@ -225,7 +234,7 @@ def train_rl(
                 }
             )
 
-            return best_params, best_reward, total_timesteps
+            return best_params.values(), best_reward, total_timesteps
     except KeyboardInterrupt:
         print("Interrupted by User!\nStopping...")
 

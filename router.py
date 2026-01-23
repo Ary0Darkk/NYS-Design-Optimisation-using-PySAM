@@ -196,7 +196,11 @@ def run_router():
                 )
 
                 if optimals is not None:
-                    design_dict = dict(zip(CONFIG["design"]["overrides"], optimals[0]))
+                    # Force every value to be a native Python float
+                    design_dict = {
+                        name: float(val)
+                        for name, val in zip(CONFIG["design"]["overrides"], optimals[0])
+                    }
 
                     logger.info("Operational optimisation started !")
                     # print(f"Optimisation of : {override}")

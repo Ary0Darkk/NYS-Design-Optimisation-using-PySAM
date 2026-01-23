@@ -9,6 +9,7 @@ from multiprocessing import Pool, cpu_count
 from pathlib import Path
 import pickle
 from functools import partial
+import tabulate as tb
 
 from deap import base, creator, tools, algorithms
 
@@ -186,6 +187,9 @@ def run_deap_ga_optimisation(
                 return (individual,)
 
             toolbox.register("mutate", custom_mutation)
+            toolbox.register(
+                "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
+            )
 
             # ----------------------------
             # Multiprocessing pool (spawn-safe)
@@ -206,9 +210,6 @@ def run_deap_ga_optimisation(
             )
 
             toolbox.register("map", pool.map)
-            toolbox.register(
-                "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
-            )
 
             # ----------------------------
             # Stable checkpoint key
@@ -336,51 +337,39 @@ def run_deap_ga_optimisation(
             # Pretty console output (same style as your original code)
             # ----------------------------
             res_dict = {}
-            print("\n" + "-" * 40)
+            header_line = "-" * 40
             if optim_mode == "design":
-                print("GA Design Optimal solutions")
-                print("\n" + "-" * 40)
-                print("Final Best Solutions")
-                print("-" * 40)
-
                 for i, name in enumerate(var_names):
                     val = best_solution[i]
-
                     res_dict[name] = val  # stores in dict to save data in csv
-                    # Match formatting you used earlier
-                    if isinstance(val, float):
-                        print(f"  {name:20}: {val:.4f}")
-                    else:
-                        print(f"  {name:20}: {val}")
-
-                print("-" * 40)
-                print(f"{'Best Fitness':20}: {best_fitness:.6f}")
-                print("-" * 40)
 
                 res_dict["best_fitness"] = best_fitness
+                #  formats output
+                res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
+                logger.info(
+                    f"\n{header_line}\n"
+                    f"GA DESIGN OPTIMAL SOLUTIONS\n"
+                    f"{header_line}\n"
+                    f"Final Best Results\n"
+                    f"{res_table}"
+                )
             else:
-                print(f"GA Optimal solution (hour {curr_hour})")
-                # print(f"Results for hour = {curr_hour}")
                 res_dict["hour"] = curr_hour
-                print("\n" + "-" * 40)
-                print("Final Best Solutions")
-                print("-" * 40)
-
                 for i, name in enumerate(var_names):
                     val = best_solution[i]
-
                     res_dict[name] = val  # stores in dict to save data in csv
-                    # Match formatting you used earlier
-                    if isinstance(val, float):
-                        print(f"  {name:20}: {val:.4f}")
-                    else:
-                        print(f"  {name:20}: {val}")
-
-                print("-" * 40)
-                print(f"{'Best Fitness':20}: {best_fitness:.6f}")
-                print("-" * 40)
 
                 res_dict["best_fitness"] = best_fitness
+
+                # formats output
+                res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
+                logger.info(
+                    f"\n{header_line}\n"
+                    f"GA Optimal solution (hour {curr_hour})\n"
+                    f"{header_line}\n"
+                    f"Final Best Results\n"
+                    f"{res_table}"
+                )
 
             result_logbook = pd.DataFrame([res_dict])
             result_logbook.index = result_logbook.index + 1
