@@ -76,9 +76,7 @@ class SolarMixedOptimisationEnv(gym.Env):
 
         # ---- Run simulation ----
 
-        sim_result = run_simulation.with_options(refresh_cache=CONFIG["refresh_cache"])(
-            final_overrides
-        )
+        sim_result = run_simulation(final_overrides)
 
         if self.optim_mode == "design":
             try:

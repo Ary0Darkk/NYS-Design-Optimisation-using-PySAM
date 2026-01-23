@@ -4,7 +4,6 @@ import mlflow
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv
-from prefect import task
 import pandas as pd
 
 import multiprocessing
@@ -12,6 +11,10 @@ import multiprocessing
 from .rl_env import SolarMixedOptimisationEnv
 from .rl_util import TrialEvalCallback
 from config import CONFIG
+
+import logging
+
+logger = logging.getLogger("NYS_Optimisation")
 
 
 # creates envs
@@ -40,7 +43,6 @@ def make_env(
     return _init
 
 
-@task()
 def train_rl(
     override,
     optim_mode,
@@ -147,7 +149,7 @@ def train_rl(
 
             total_timesteps = CONFIG.get("rl_timesteps", 2)
 
-            print("PPO device:", model.policy.device)
+            logger.info(f"PPO device: {model.policy.device}")
             model.learn(
                 total_timesteps=total_timesteps,
                 callback=checkpoint_cb,

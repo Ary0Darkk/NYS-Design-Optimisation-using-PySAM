@@ -1,14 +1,14 @@
 import optuna
-from prefect import task
-from prefect.logging import get_run_logger
+import logging
 from .ppo_rl_training import train_rl
+
+logger = logging.getLogger("NYS_Optimisation")
 
 
 def objective(
     trial,
     override,
 ):
-    logger = get_run_logger()
     # Optuna will pick new values for these for every trial
     # define your hyperparamters range
     tuning_params = {
@@ -34,9 +34,7 @@ def objective(
     return best_reward
 
 
-@task()
 def run_rl_study(override):
-    logger = get_run_logger()
     # This DB allows your 2 PCs to share the same tuning work
     # storage = "postgresql://user:pass@your-main-pc-ip:5432/optuna_db"
 

@@ -4,14 +4,13 @@ import pandas as pd
 import mlflow
 import json
 import hashlib
+import logging
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 import pickle
 from functools import partial
 
 from deap import base, creator, tools, algorithms
-from prefect import task
-from prefect.logging import get_run_logger
 
 from utilities.checkpointing import atomic_pickle_dump
 from config import CONFIG
@@ -56,9 +55,7 @@ def deap_fitness(individual, hour, optim_mode: str):
 
     final_overrides = {**overrides_dyn, **_GA_STATIC_OVERRIDES}
 
-    sim_result = run_simulation.with_options(refresh_cache=CONFIG["refresh_cache"])(
-        final_overrides
-    )
+    sim_result = run_simulation(final_overrides)
 
     if optim_mode == "design":
         try:
@@ -104,7 +101,8 @@ def evaluate_population(toolbox, population):
 # ============================================================
 # MAIN GA TASK
 # ============================================================
-@task()
+
+
 def run_deap_ga_optimisation(
     override: dict,
     optim_mode: str,
@@ -113,8 +111,7 @@ def run_deap_ga_optimisation(
     curr_hour: int,
 ):
     try:
-        logger = get_run_logger()
-
+        logger = logging.getLogger("NYS_Optimisation")
         if optim_mode == "design":
             run_name = "GA_Design_optimisation"
         else:

@@ -20,7 +20,7 @@ mlruns
 # prefect cache
 .prefect_cache
 
-# checkpoints cache
+# local cache folders
 checkpoints
 results
-prefect-results
+logs

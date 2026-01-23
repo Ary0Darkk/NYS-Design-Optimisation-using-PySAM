@@ -8,14 +8,12 @@ from config import CONFIG
 import mlflow
 import dagshub
 
-from prefect import task
-from prefect.logging import get_run_logger
+import logging
+
+logger = logging.getLogger("NYS_Optimisation")
 
 
-@task
 def optimisation_mode() -> str | dict[str, list[float]]:
-    logger = get_run_logger()
-
     override = None
     if CONFIG["route"] == "design":
         override = "design"
@@ -26,12 +24,11 @@ def optimisation_mode() -> str | dict[str, list[float]]:
     else:
         print(f"{CONFIG['route']} : Not found! ")
 
-    logger.debug(f"{override} route taken!")
+    logger.info(f"{override} route taken!")
 
     return override
 
 
-@task
 def call_optimiser(
     override: dict[str, list[float]],
     optim_mode: str,
@@ -41,7 +38,6 @@ def call_optimiser(
 ):
     # FIXME : try and catch is not working as expected,
     # look at keyboard interupt working
-    logger = get_run_logger()
 
     if static_overrides is None:
         static_overrides = {}
@@ -83,7 +79,6 @@ def call_optimiser(
         else:
             print(f"{opt_type} : Not a valid optimiser name in CONFIG")
 
-        logger.debug(f"{opt_type} started!")
         # only print if the variables were successfully set
         if x_opt is not None:
             logger.info(f"x_opt : {x_opt}")
@@ -97,7 +92,6 @@ def call_optimiser(
     return x_opt, f_val, o_metrices
 
 
-@task
 def call_tuner(override: dict[str, list[float]]):
     # call run study
     run_rl_study(
@@ -105,7 +99,6 @@ def call_tuner(override: dict[str, list[float]]):
     )
 
 
-@task
 def run_hourly_optimisation(
     override: dict[str, list[float]],
     optim_mode: str,
@@ -135,10 +128,7 @@ def run_hourly_optimisation(
     return results
 
 
-@task
 def run_router():
-    logger = get_run_logger()
-
     # database setup
     mlflow.set_tracking_uri(
         "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"

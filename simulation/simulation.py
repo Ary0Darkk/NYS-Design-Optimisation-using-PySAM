@@ -1,14 +1,19 @@
 import json
+import json
 import PySAM.TroughPhysical as TP
 import hashlib
 
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
+from utilities.setup_custom_logger import setup_custom_logger
 
-from prefect import task
-from prefect.logging import get_run_logger
-from prefect.filesystems import LocalFileSystem
-from datetime import timedelta
+import logging
+
+# Set up logging if not already done
+if not logging.getLogger("NYS_Optimisation").hasHandlers():
+    logger = setup_custom_logger()
+else:
+    logger = logging.getLogger("NYS_Optimisation")
 
 
 def canonicalize_overrides(overrides):
@@ -33,21 +38,13 @@ def canonicalize_overrides(overrides):
     )
 
 
-def simulation_cache_key(context, parameters):
+def simulation_cache_key(parameters):
     canon = canonicalize_overrides(parameters["overrides"])
     digest = hashlib.sha256(repr(canon).encode()).hexdigest()
     return f"sim_{digest}"
 
 
-@task(
-    cache_key_fn=simulation_cache_key,
-    persist_result=True,
-    cache_expiration=timedelta(days=30),
-    result_storage=CONFIG["storage_block"],
-)
 def run_simulation(overrides: dict):
-    logger = get_run_logger()
-
     overrides = dict(overrides)
 
     # handle mass flow rate values
@@ -58,15 +55,14 @@ def run_simulation(overrides: dict):
             del overrides["m_dot"]
             break
 
-    logger.info(f"Current paramters : {overrides}")
 
     tp = TP.default(CONFIG["model"])
-    logger.info(f"{CONFIG['model']} model loaded!")
+    # logger.info(f"{CONFIG['model']} model loaded!")
 
     # Load JSON
     with open(CONFIG["json_file"], "r") as f:
         data = json.load(f)
-    logger.info(f"{CONFIG['json_file']} file loaded!")
+    # logger.info(f"{CONFIG['json_file']} file loaded!")
 
     # assign(dict) -> None : takes dict and copies the values into the PySAM model
     # export() -> dict : pulls every single parameter currently set in that
@@ -82,7 +78,7 @@ def run_simulation(overrides: dict):
             except Exception:
                 pass
 
-    logger.info("Variables assigned from json file to model!")
+    # logger.info("Variables assigned from json file to model!")
 
     # Apply overrides (changed parameters)
     if overrides:
@@ -109,10 +105,10 @@ def run_simulation(overrides: dict):
             else:
                 print(f"Skipping key {k}: Unknown type {type(current_val)}")
             # print(f'Value after : {tp.value(k)}')
-    logger.info("Custom overrides of variables performed!")
-    logger.info("Simulation started...")
+    # logger.info("Custom overrides of variables performed!")
+    # logger.info("Simulation started...")
     tp.execute()
-    logger.info("Simulation finished!")
+    # logger.info("Simulation finished!")
 
     sim_result = {
         "hourly_energy": tp.Outputs.P_cycle,  # FIXME: I think here I should take PC electrical power output : P_cycle as P_out_net is net, not gross
@@ -130,5 +126,6 @@ def run_simulation(overrides: dict):
         "annual_energy": tp.Outputs.annual_energy,
     }
 
-    logger.info("Outputs written to sim_result dict!")
+    logger.info(f"Ran sim with paramters : {overrides}")
+    # logger.info("Outputs written to sim_result dict!")
     return sim_result  # dict of outputs
