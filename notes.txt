@@ -119,3 +119,6 @@ We are adding new terms to our objective function, below is the list of them:
 
 2026-1-21
 currently I am facing problem of floating point precision, because if I am take a higher precision, my search space is going to blow up. So I need to make lower precision enough so that I can handle search space enough.
+
+2026-1-23
+I think I need to remove this logging to local device, because it is a bottleneck to send and retrieve files from there. Essentially not providing marginal gain in time reduction. So remove saving to aws-S3 and probably use prefect to save its log on local machine only.

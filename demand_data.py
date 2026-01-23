@@ -27,10 +27,15 @@ def format_data(file_path: str, show_demand_plot: bool):
     ].reset_index(drop=True)
 
     if show_demand_plot is True:
+        plt.figure(figsize=(12, 6))
         plt.plot(
             formatted_demand_df["DateTime"],
             formatted_demand_df["Hourly Demand Met (in MW)"],
         )
+        plt.xlabel("DateTime")
+        plt.ylabel("Hourly Demand Met (MW)")
+        plt.title("Hourly Demand Met Over Time")
+        plt.grid(True)
         plt.show()
 
     # print(max(formatted_demand_df['Hourly Demand Met (in MW)']))
@@ -76,10 +81,15 @@ def get_dynamic_price() -> pd.DataFrame:
     final_dataset = pd.concat([formatted_data, dynamic_price_data_df], axis=1)
 
     if CONFIG["show_price_plot"] is True:
+        plt.figure(figsize=(12, 6))
         plt.plot(
             final_dataset["DateTime"],
             final_dataset["dynamic_price"],
         )
+        plt.xlabel("DateTime")
+        plt.ylabel("Dynamic Price")
+        plt.title("Dynamic Price Over Time")
+        plt.grid(True)
         plt.show()
 
     # print(dynamic_price_data.head())
@@ -96,3 +106,13 @@ def get_dynamic_price() -> pd.DataFrame:
     # print(type(final_dataset))
 
     return final_dataset
+
+
+def save_data():
+    final_dataset = get_dynamic_price()
+
+    final_dataset.to_csv(Path("electricity_data/dynamic_price_data"))
+
+
+if __name__ == "__main__":
+    save_data()

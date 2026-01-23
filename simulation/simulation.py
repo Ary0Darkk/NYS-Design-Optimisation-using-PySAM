@@ -7,6 +7,7 @@ from utilities.list_nesting import replace_1st_order
 
 from prefect import task
 from prefect.logging import get_run_logger
+from prefect.filesystems import LocalFileSystem
 from datetime import timedelta
 
 

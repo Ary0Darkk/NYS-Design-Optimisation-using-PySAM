@@ -12,15 +12,15 @@ CONFIG = {
     "author": "Aryan",
     "run_name": None,
     "demand_file_path": "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx",
-    "show_demand_plot": False,
-    "show_price_plot": False,
+    "show_demand_plot": True,
+    "show_price_plot": True,
     "is_tuning": False,
     # optimiser -> choose "deap_ga" or "rl_optim"
     "optimiser": "rl_optim",  # Initial guess
     "route": "design",  # des-operational
     "resume_from_checkpoint": False,
     "refresh_cache": True,
-    "storage_block": "s3-bucket/s3-cache",
+    "storage_block": "local-file-system/local-storage",
     "num_cores": 4,
     # overrides
     "design": {

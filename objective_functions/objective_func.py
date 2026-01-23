@@ -1,6 +1,17 @@
 import pandas as pd
+from functools import cache
 from pathlib import Path
 from demand_data import get_dynamic_price
+
+
+@cache
+def get_cached_dynamic_price():
+    file_path = Path("electricity_data/dynamic_price_data")
+    if file_path.exists():
+        df = pd.read_csv(file_path)
+        return df["dynamic_price"].values
+    else:
+        return get_dynamic_price()["dynamic_price"].values
 
 
 # calculate objective function value
@@ -28,7 +39,7 @@ def objective_function(
         "pc_startup_thermal_power": pc_startup_thermal_power,  # MWt
         "field_piping_thermal_loss": field_piping_thermal_loss,  # MWt
         "receiver_thermal_loss": receiver_thermal_loss,  # MWt
-        "dynamic_price": get_dynamic_price()["dynamic_price"].values,  # Rs./KWh
+        "dynamic_price": get_cached_dynamic_price(),  # Rs./KWh
     }
 
     # Create the DataFrame all at once

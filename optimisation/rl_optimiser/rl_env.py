@@ -75,6 +75,7 @@ class SolarMixedOptimisationEnv(gym.Env):
         final_overrides = {**overrides_dyn, **self.static_overrides}
 
         # ---- Run simulation ----
+
         sim_result = run_simulation.with_options(refresh_cache=CONFIG["refresh_cache"])(
             final_overrides
         )
