@@ -1,19 +1,27 @@
 import json
+import os
 import PySAM.TroughPhysical as TP
 import hashlib
 import tabulate as tb
+import time
 
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
 from utilities.setup_custom_logger import setup_custom_logger
 
 import logging
+from joblib import Memory, hash as joblib_hash
 
 # Set up logging if not already done
 if not logging.getLogger("NYS_Optimisation").hasHandlers():
     logger = setup_custom_logger()
 else:
     logger = logging.getLogger("NYS_Optimisation")
+
+# Define codes
+NEW = "\033[0;36m"  # Cyan
+CACHED = "\033[0;32m"  # Green
+RESET = "\033[0m"  # No Color
 
 
 def canonicalize_overrides(overrides):
@@ -39,12 +47,70 @@ def canonicalize_overrides(overrides):
 
 
 def simulation_cache_key(parameters):
-    canon = canonicalize_overrides(parameters["overrides"])
+    canon = parameters["overrides"]
     digest = hashlib.sha256(repr(canon).encode()).hexdigest()
     return f"sim_{digest}"
 
 
+# setup the cache directory (it will be created automatically)
+# Setting mmap_mode='r' makes it very fast for large arrays
+cachedir = os.path.join(os.getcwd(), "sim_cache")
+memory = Memory(cachedir, verbose=0, mmap_mode="r")
+
+
 def run_simulation(overrides: dict):
+    """
+    The main entry point. It checks the cache status,
+    executes the core, and logs dynamically.
+    """
+    # check if it's already on disk
+    # use joblib_hash and the internal joblib folder structure
+    # arg_hash = joblib_hash(dict(overrides))
+
+    # Note: 'simulation' is the name of this file (simulation.py)
+    # If this file is named engine.py, change 'simulation' to 'engine'
+    # path_parts = [
+    #     cachedir, 
+    #     "joblib", 
+    #     "simulation", 
+    #     "simulation", 
+    #     "_run_simulation_core", 
+    #     arg_hash, 
+    #     "output.pkl"
+    # ]
+    # cache_path = os.path.join(*path_parts)
+    # cache_path = os.path.join(
+    #     cachedir,
+    #     "joblib",
+    #     "simulation",
+    #     "simulation",
+    #     "_run_simulation_core",
+    #     arg_hash,
+    #     "output.pkl",
+    # )
+
+    # is_cached = os.path.exists(cache_path)
+
+    start = time.time()
+    # run the actual simulation (joblib handles the loading)
+    result = _run_simulation_core(overrides)
+    duration = time.time() - start
+
+    is_cached = duration < 0.1
+
+    # dynamic Logging & Table
+    status_tag = f"{CACHED}[CACHED]{RESET}" if is_cached else f"{NEW}[NEW RUN]{RESET}"
+
+    table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
+
+    # log message changes dynamically
+    logger.info(f"{status_tag} Simulation processed with parameters:\n{table}")
+
+    return result
+
+
+@memory.cache
+def _run_simulation_core(overrides: dict):
     overrides = dict(overrides)
 
     # handle mass flow rate values
@@ -125,7 +191,5 @@ def run_simulation(overrides: dict):
         "annual_energy": tp.Outputs.annual_energy,
     }
 
-    table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
-    logger.info(f"Ran sim with paramters :\n{table}")
     # logger.info("Outputs written to sim_result dict!")
     return sim_result  # dict of outputs

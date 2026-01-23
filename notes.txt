@@ -137,3 +137,6 @@ obj = (
     )
 
 Also I need to see checkpointing is happening regularly or not.Look for simulation caching too!
+
+2026-1-24
+I did caching. Now I need to see checkpointing and I noticed my workers get flushed after each hour, this can be one of the bottlenecks. Also trackio, I need to see.

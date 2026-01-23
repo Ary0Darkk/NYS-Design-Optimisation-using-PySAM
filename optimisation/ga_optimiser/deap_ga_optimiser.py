@@ -10,6 +10,7 @@ from pathlib import Path
 import pickle
 from functools import partial
 import tabulate as tb
+from joblib import hash as joblib_hash
 
 from deap import base, creator, tools, algorithms
 
@@ -17,6 +18,8 @@ from utilities.checkpointing import atomic_pickle_dump
 from config import CONFIG
 from simulation import run_simulation
 from objective_functions import objective_function
+
+logger = logging.getLogger("NYS_Optimisation")
 
 
 # ----------------------------
@@ -57,6 +60,10 @@ def deap_fitness(individual, hour, optim_mode: str):
     final_overrides = {**overrides_dyn, **_GA_STATIC_OVERRIDES}
 
     sim_result = run_simulation(final_overrides)
+    # table = tb.tabulate(
+    #     [final_overrides.values()], headers=final_overrides.keys(), tablefmt="psql"
+    # )
+    # logger.info(f"Ran sim with paramters :\n{table}")
 
     if optim_mode == "design":
         try:
@@ -112,7 +119,6 @@ def run_deap_ga_optimisation(
     curr_hour: int,
 ):
     try:
-        logger = logging.getLogger("NYS_Optimisation")
         if optim_mode == "design":
             run_name = "GA_Design_optimisation"
         else:

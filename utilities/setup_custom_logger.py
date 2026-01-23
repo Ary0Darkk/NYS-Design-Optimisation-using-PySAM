@@ -48,7 +48,7 @@ def setup_custom_logger(name="NYS_Optimisation", log_folder="logs", existing_fil
         "%(asctime)s | PID:%(process)-5d | %(levelname)-8s | %(filename)s:%(funcName)s:%(lineno)d | %(message)s"
     )
     console_formatter = logging.Formatter(
-        f"{BLUE}%(asctime)s{RESET} | {MAGNETA}PID:%(process)-5d{RESET} | {GREEN}%(levelname)-8s{RESET} | {CYAN}%(filename)s:%(funcName)s:%(lineno)d{RESET} | {LIGHT_GRAY}%(message)s{RESET}"
+        f"{BLUE}%(asctime)s{RESET} | {MAGNETA}PID:%(process)-5d{RESET} | {GREEN}%(levelname)-8s{RESET} | %(filename)s:%(funcName)s:%(lineno)d | {LIGHT_GRAY}%(message)s{RESET}"
     )
     # console_formatter = logging.Formatter('%(levelname)-8s | %(message)s')
 

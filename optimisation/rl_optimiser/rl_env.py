@@ -1,10 +1,14 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
+import logging
+import tabulate as tb
 
 from simulation import run_simulation
 from objective_functions import objective_function
 from config import CONFIG
+
+logger = logging.getLogger("NYS_Optimisation")
 
 
 class SolarMixedOptimisationEnv(gym.Env):
@@ -79,6 +83,10 @@ class SolarMixedOptimisationEnv(gym.Env):
         # ---- Run simulation ----
 
         sim_result = run_simulation(final_overrides)
+        # table = tb.tabulate(
+        #     [final_overrides.values()], headers=final_overrides.keys(), tablefmt="psql"
+        # )
+        # logger.info(f"Ran sim with paramters :\n{table}")
 
         if self.optim_mode == "design":
             try:

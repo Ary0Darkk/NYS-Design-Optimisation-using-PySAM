@@ -121,7 +121,7 @@ def train_rl(
                     gae_lambda=0.95,
                     clip_range=0.2,
                     device="cpu",  # available
-                    verbose=1,
+                    verbose=0,
                     seed=CONFIG.get("random_seed", 21),
                 )
 
