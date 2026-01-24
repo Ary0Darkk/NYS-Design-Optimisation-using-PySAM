@@ -2,11 +2,9 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import logging
-import tabulate as tb
 
 from simulation import run_simulation
 from objective_functions import objective_function
-from config import CONFIG
 
 logger = logging.getLogger("NYS_Optimisation")
 
@@ -51,6 +49,22 @@ class SolarMixedOptimisationEnv(gym.Env):
         self.max_steps = max_steps
         self.current_step = 0
         self.state = None
+
+    def update_parameters(self, hour_index, static_overrides):
+        """
+        Updates the target hour and static parameters without
+        restarting the worker process.
+        """
+        self.hour_index = hour_index
+
+        # Ensure static overrides are native floats (PySAM compatibility)
+        self.static_overrides = {k: float(v) for k, v in static_overrides.items()}
+
+        # Reset internal step counter so the new hour starts fresh
+        self.current_step = 0
+
+        # Return True is required for SB3's env_method to confirm success
+        return True
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

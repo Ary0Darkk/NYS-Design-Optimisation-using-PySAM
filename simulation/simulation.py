@@ -10,7 +10,7 @@ from utilities.list_nesting import replace_1st_order
 from utilities.setup_custom_logger import setup_custom_logger
 
 import logging
-from joblib import Memory, hash as joblib_hash
+from joblib import Memory
 
 # Set up logging if not already done
 if not logging.getLogger("NYS_Optimisation").hasHandlers():
@@ -22,6 +22,9 @@ else:
 NEW = "\033[0;36m"  # Cyan
 CACHED = "\033[0;32m"  # Green
 RESET = "\033[0m"  # No Color
+LIGHT_GRAY = "\033[2m"
+
+_WARM_MODEL = None
 
 
 def canonicalize_overrides(overrides):
@@ -70,12 +73,12 @@ def run_simulation(overrides: dict):
     # Note: 'simulation' is the name of this file (simulation.py)
     # If this file is named engine.py, change 'simulation' to 'engine'
     # path_parts = [
-    #     cachedir, 
-    #     "joblib", 
-    #     "simulation", 
-    #     "simulation", 
-    #     "_run_simulation_core", 
-    #     arg_hash, 
+    #     cachedir,
+    #     "joblib",
+    #     "simulation",
+    #     "simulation",
+    #     "_run_simulation_core",
+    #     arg_hash,
     #     "output.pkl"
     # ]
     # cache_path = os.path.join(*path_parts)
@@ -104,7 +107,13 @@ def run_simulation(overrides: dict):
     table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
 
     # log message changes dynamically
-    logger.info(f"{status_tag} Simulation processed with parameters:\n{table}")
+    if not is_cached:
+        logger.info(f"{status_tag} [{duration:.3f}sec] New simulation :\n{table}")
+    else:
+        # Optional: Just a one-line log for hits to keep the file clean
+        logger.info(
+            f"{status_tag} {LIGHT_GRAY}Hit - Parameters: {list(overrides.values())}{RESET}"
+        )
 
     return result
 
@@ -120,13 +129,26 @@ def _run_simulation_core(overrides: dict):
             overrides["m_dot_htfmax"] = value
             del overrides["m_dot"]
             break
+    global _WARM_MODEL
+    if _WARM_MODEL is None:
+        # Load heavy PySAM model once per worker lifetime
+        _WARM_MODEL = TP.default(CONFIG["model"])
 
-    tp = TP.default(CONFIG["model"])
+        # Load JSON
+        with open(CONFIG["json_file"], "r") as f:
+            data = json.load(f)
+
+        # initial assignment of all variables from JSON
+        for k, v in data.items():
+            if k != "number_inputs":
+                try:
+                    _WARM_MODEL.value(k, v)
+                except Exception:
+                    pass
+
+    # tp = TP.default(CONFIG["model"])
     # logger.info(f"{CONFIG['model']} model loaded!")
 
-    # Load JSON
-    with open(CONFIG["json_file"], "r") as f:
-        data = json.load(f)
     # logger.info(f"{CONFIG['json_file']} file loaded!")
 
     # assign(dict) -> None : takes dict and copies the values into the PySAM model
@@ -136,12 +158,6 @@ def _run_simulation_core(overrides: dict):
     # PySAM will "unassign" or clear all other variables in that module that are not in your dictionary.
     # NOTE : can't use assign here, because we are assigning
     # variables of different sub-modules
-    for k, v in data.items():
-        if k != "number_inputs":
-            try:
-                tp.value(k, v)
-            except Exception:
-                pass
 
     # logger.info("Variables assigned from json file to model!")
 
@@ -150,21 +166,21 @@ def _run_simulation_core(overrides: dict):
         for k, v in overrides.items():
             # print(f'Value before : {tp.value(k)}')
             # Fetch current value once (Best practice for performance)
-            current_val = tp.value(k)
+            current_val = _WARM_MODEL.value(k)
 
             # Case: Scalar (int, float, or boolean)
             if isinstance(current_val, (int, float, bool)):
-                tp.value(k, v)
+                _WARM_MODEL.value(k, v)
 
             #  Case: 1st Order Sequence (List or Tuple)
             elif isinstance(current_val, (list, tuple)):
                 if len(current_val) > 0:
                     # Use your 1st order function to swap the first element
                     v_new = replace_1st_order(data=current_val, new_val=v)
-                    tp.value(k, v_new)
+                    _WARM_MODEL.value(k, v_new)
                 else:
                     # If the list is empty, we initialize it with the new value
-                    tp.value(k, [v] if isinstance(current_val, list) else (v,))
+                    _WARM_MODEL.value(k, [v] if isinstance(current_val, list) else (v,))
 
             # 4. Optional: Log or skip if it's an unexpected type (like a string)
             else:
@@ -172,23 +188,23 @@ def _run_simulation_core(overrides: dict):
             # print(f'Value after : {tp.value(k)}')
     # logger.info("Custom overrides of variables performed!")
     # logger.info("Simulation started...")
-    tp.execute()
+    _WARM_MODEL.execute()
     # logger.info("Simulation finished!")
 
     sim_result = {
-        "hourly_energy": tp.Outputs.P_cycle,  # FIXME: I think here I should take PC electrical power output : P_cycle as P_out_net is net, not gross
-        "pc_htf_pump_power": tp.Outputs.cycle_htf_pump_power,
-        "field_htf_pump_power": tp.Outputs.W_dot_field_pump,
-        "field_collector_tracking_power": tp.Outputs.W_dot_sca_track,
-        "pc_startup_thermal_power": tp.Outputs.q_dot_pc_startup,
-        "field_piping_thermal_loss": tp.Outputs.q_dot_piping_loss,
-        "receiver_thermal_loss": tp.Outputs.q_dot_rec_thermal_loss,
+        "hourly_energy": _WARM_MODEL.Outputs.P_cycle,  # FIXME: I think here I should take PC electrical power output : P_cycle as P_out_net is net, not gross
+        "pc_htf_pump_power": _WARM_MODEL.Outputs.cycle_htf_pump_power,
+        "field_htf_pump_power": _WARM_MODEL.Outputs.W_dot_field_pump,
+        "field_collector_tracking_power": _WARM_MODEL.Outputs.W_dot_sca_track,
+        "pc_startup_thermal_power": _WARM_MODEL.Outputs.q_dot_pc_startup,
+        "field_piping_thermal_loss": _WARM_MODEL.Outputs.q_dot_piping_loss,
+        "receiver_thermal_loss": _WARM_MODEL.Outputs.q_dot_rec_thermal_loss,
         # "field_collector_row_shadowing_loss": tp.Outputs.RowShadow_ave,
         # "parasitic_power_generation_dependent_load": tp.Outputs.P_plant_balance_tot,
         # "parasitic_power_fixed_load": tp.Outputs.P_fixed,
         # "parasitic_power_condenser_operation": tp.Outputs.P_cooling_tower_tot,
         # NOTE: I am not taking Field collector optical end loss:EndLoss_ave for now!
-        "annual_energy": tp.Outputs.annual_energy,
+        "annual_energy": _WARM_MODEL.Outputs.annual_energy,
     }
 
     # logger.info("Outputs written to sim_result dict!")

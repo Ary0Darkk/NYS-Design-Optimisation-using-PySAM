@@ -4,10 +4,7 @@ import tabulate as tb
 import mlflow
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import SubprocVecEnv
 import pandas as pd
-
-import multiprocessing
 
 from .rl_env import SolarMixedOptimisationEnv
 from .rl_util import TrialEvalCallback
@@ -53,6 +50,7 @@ def train_rl(
     tuned_hyperparams=None,  # dict from Optuna
     is_tuning=False,  # flag to change behavior
     trial=None,  # Optuna Trial object
+    env=None,
 ):
     try:
         if optim_mode == "design":
@@ -73,23 +71,23 @@ def train_rl(
             var_types = override["types"]
             lb, ub = override["lb"], override["ub"]
 
-            num_envs = min(4, multiprocessing.cpu_count())  # use physical cores
+            # num_envs = min(4, multiprocessing.cpu_count())  # use physical cores
 
-            env = SubprocVecEnv(
-                [
-                    make_env(
-                        var_names,
-                        var_types,
-                        lb,
-                        ub,
-                        static_overrides,
-                        hour_index,
-                        CONFIG["rl_max_steps"],
-                        optim_mode,
-                    )
-                    for _ in range(num_envs)
-                ]
-            )
+            # env = SubprocVecEnv(
+            #     [
+            #         make_env(
+            #             var_names,
+            #             var_types,
+            #             lb,
+            #             ub,
+            #             static_overrides,
+            #             hour_index,
+            #             CONFIG["rl_max_steps"],
+            #             optim_mode,
+            #         )
+            #         for _ in range(num_envs)
+            #     ]
+            # )
 
             # ---- Checkpoint directory ----
             ckpt_dir = Path("checkpoints") / "rl" / f"hour_{hour_index}"
@@ -240,5 +238,4 @@ def train_rl(
 
     finally:
         # close worker pool
-        print("Closing worker pool...")
-        env.close()
+        print(f"At sim hour = {hour_index} ")

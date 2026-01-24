@@ -17,7 +17,7 @@ CONFIG = {
     "is_tuning": False,
     # optimiser -> choose "deap_ga" or "rl_optim"
     "optimiser": "rl_optim",  # Initial guess
-    "route": "des-operational",  # des-operational
+    "route": "operational",  # des-operational
     "resume_from_checkpoint": False,
     "refresh_cache": True,
     "storage_block": "local-file-system/local-storage",

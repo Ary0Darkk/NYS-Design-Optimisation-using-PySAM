@@ -5,12 +5,10 @@ import mlflow
 import json
 import hashlib
 import logging
-from multiprocessing import Pool, cpu_count
 from pathlib import Path
 import pickle
 from functools import partial
 import tabulate as tb
-from joblib import hash as joblib_hash
 
 from deap import base, creator, tools, algorithms
 
@@ -51,13 +49,13 @@ def init_worker(
 # ============================================================
 # FITNESS FUNCTION (MUST BE TOP-LEVEL)
 # ============================================================
-def deap_fitness(individual, hour, optim_mode: str):
+def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_overrides):
+    # Use the passed-in variables instead of Globals
     overrides_dyn = {
-        _GA_VAR_NAMES[i]: _GA_VAR_TYPES[i](individual[i])
-        for i in range(len(_GA_VAR_NAMES))
+        var_names[i]: var_types[i](individual[i]) for i in range(len(var_names))
     }
 
-    final_overrides = {**overrides_dyn, **_GA_STATIC_OVERRIDES}
+    final_overrides = {**overrides_dyn, **static_overrides}
 
     sim_result = run_simulation(final_overrides)
     # table = tb.tabulate(
@@ -117,6 +115,7 @@ def run_deap_ga_optimisation(
     static_overrides: dict[str, float],
     is_nested: bool,
     curr_hour: int,
+    pool,
 ):
     try:
         if optim_mode == "design":
@@ -157,6 +156,13 @@ def run_deap_ga_optimisation(
             if not hasattr(creator, "Individual"):
                 creator.create("Individual", list, fitness=creator.FitnessMax)
 
+            # init_worker(
+            #     var_names=var_names,
+            #     var_types=var_types,
+            #     lb=lb,
+            #     ub=ub,
+            #     static_overrides=static_overrides,
+            # )
             toolbox = base.Toolbox()
 
             def gen_individual():
@@ -171,7 +177,13 @@ def run_deap_ga_optimisation(
             toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
             toolbox.register(
-                "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
+                "evaluate",
+                deap_fitness,
+                optim_mode=optim_mode,
+                hour=curr_hour,
+                var_names=var_names,
+                var_types=var_types,
+                static_overrides=static_overrides,
             )
             toolbox.register(
                 "select",
@@ -193,27 +205,27 @@ def run_deap_ga_optimisation(
                 return (individual,)
 
             toolbox.register("mutate", custom_mutation)
-            toolbox.register(
-                "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
-            )
+            # toolbox.register(
+            #     "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
+            # )
 
             # ----------------------------
             # Multiprocessing pool (spawn-safe)
             # ----------------------------
-            n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
-            logger.info(f"{n_cores} cores working!")
+            # n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
+            # logger.info(f"{n_cores} cores working!")
 
-            pool = Pool(
-                processes=n_cores,
-                initializer=init_worker,
-                initargs=(
-                    var_names,
-                    var_types,
-                    lb,
-                    ub,
-                    static_overrides,
-                ),
-            )
+            # pool = Pool(
+            #     processes=n_cores,
+            #     initializer=init_worker,
+            #     initargs=(
+            #         var_names,
+            #         var_types,
+            #         lb,
+            #         ub,
+            #         static_overrides,
+            #     ),
+            # )
 
             toolbox.register("map", pool.map)
 
@@ -407,7 +419,4 @@ def run_deap_ga_optimisation(
         print("Interrupted by User!\nStopping...")
 
     finally:
-        # clean pool
-        pool.close()
-        pool.join()
-        print("Flushed all processes!")
+        print(f"At sim hour={curr_hour}")
