@@ -24,3 +24,4 @@ mlruns
 checkpoints
 results
 logs
+sim_cache
