@@ -48,70 +48,97 @@ def objective_function(
     # Shift the index to start at 1
     df.index = df.index + 1
 
-    # If you need to access them individually later:
-    # hourly_energy_df = df["hourly_energy"]
+    # ---- init terms ----
+    hourly_energy_value = df["hourly_energy"][hour_index]
+    hourly_energy_cost_term = (
+        hourly_energy_value * df["dynamic_price"][hour_index] * 1_000
+    )
+    field_htf_pump_power_value = df["field_htf_pump_power"][hour_index]
+    field_htf_pump_power_cost_term = (
+        field_htf_pump_power_value * df["dynamic_price"][hour_index] * 1_000
+    )
+    pc_htf_pump_power_value = df["pc_htf_pump_power"][hour_index]
+    pc_htf_pump_power_cost_term = (
+        pc_htf_pump_power_value * df["dynamic_price"][hour_index] * 1_000
+    )
+    field_collector_tracking_power_value = df["field_collector_tracking_power"][
+        hour_index
+    ]
+    field_collector_tracking_power_cost_term = (
+        field_collector_tracking_power_value * df["dynamic_price"][hour_index] * 1_000
+    )
+    pc_startup_thermal_power_value = df["pc_startup_thermal_power"][hour_index]
+    pc_startup_thermal_power_cost_term = (
+        pc_startup_thermal_power_value * df["dynamic_price"][hour_index] * 1_000 * 0.4
+    )
+    field_piping_thermal_loss_value = df["field_piping_thermal_loss"][hour_index]
+    field_piping_thermal_loss_cost_term = (
+        field_piping_thermal_loss_value * df["dynamic_price"][hour_index] * 1_000 * 0.4
+    )
+    receiver_thermal_loss_value = df["receiver_thermal_loss"][hour_index]
+    receiver_thermal_loss_cost_term = (
+        receiver_thermal_loss_value * df["dynamic_price"][hour_index] * 1_000 * 0.4
+    )
+    dynamic_price_value = df["dynamic_price"][hour_index]
 
-    hourly_energy_term = (
-        df["hourly_energy"][hour_index] * df["dynamic_price"][hour_index] * 1_000
-    )
-    field_htf_pump_power_term = (
-        df["field_htf_pump_power"][hour_index] * df["dynamic_price"][hour_index] * 1_000
-    )
-    pc_htf_pump_power_term = (
-        df["pc_htf_pump_power"][hour_index] * df["dynamic_price"][hour_index] * 1_000
-    )
-    field_collector_tracking_power_term = (
-        df["field_collector_tracking_power"][hour_index]
-        * df["dynamic_price"][hour_index]
-        * 1_000
-    )
-    pc_startup_thermal_power_term = (
-        df["pc_startup_thermal_power"][hour_index]
-        * df["dynamic_price"][hour_index]
-        * 1_000
-        * 0.4
-    )
-    field_piping_thermal_loss_term = (
-        df["field_piping_thermal_loss"][hour_index]
-        * df["dynamic_price"][hour_index]
-        * 1_000
-        * 0.4
-    )
-    receiver_thermal_loss_term = (
-        df["receiver_thermal_loss"][hour_index]
-        * df["dynamic_price"][hour_index]
-        * 1_000
-        * 0.4
-    )
+    # ---- objective function ----
     obj = (
-        hourly_energy_term  # gross term followed by other penality terms
-        - field_htf_pump_power_term
-        - pc_htf_pump_power_term
-        - field_collector_tracking_power_term
-        - pc_startup_thermal_power_term
-        - field_piping_thermal_loss_term
-        - receiver_thermal_loss_term
+        hourly_energy_cost_term  # gross term followed by other penality terms
+        - field_htf_pump_power_cost_term
+        - pc_htf_pump_power_cost_term
+        - field_collector_tracking_power_cost_term
+        - pc_startup_thermal_power_cost_term
+        - field_piping_thermal_loss_cost_term
+        - receiver_thermal_loss_cost_term
     )
+
+    # ---- save value of terms ----
+    values_data = {}  # init dict
+    values_data["dynamic_price_value"] = dynamic_price_value
+    values_data["hourly_energy_value"] = hourly_energy_value
+    values_data["field_htf_pump_power_value"] = field_htf_pump_power_value
+    values_data["pc_htf_pump_power_value"] = pc_htf_pump_power_value
+    values_data["field_collector_tracking_power_value"] = (
+        field_collector_tracking_power_value
+    )
+    values_data["pc_startup_thermal_power_value"] = pc_startup_thermal_power_value
+    values_data["field_piping_thermal_loss_value"] = field_piping_thermal_loss_value
+    values_data["receiver_thermal_loss_value"] = receiver_thermal_loss_value
+    values_data["hour"] = hour_index
+    value_data_logbook = pd.DataFrame([values_data])
+
+    value_data_logbook = value_data_logbook.set_index("hour")
+
+    value_data_file_name = Path("results/value_data.csv")
+    value_data_file_name.parent.mkdir(exist_ok=True)
+
+    value_file_exists = value_data_file_name.exists()
+    value_data_logbook.to_csv(
+        value_data_file_name, mode="a", header=not value_file_exists
+    )
+
+    # ---- save complete term values in monetry unit ----
     terms_data = {}
     terms_data["objective_fn_value"] = obj
-    terms_data["hourly_energy_term"] = hourly_energy_term
-    terms_data["field_htf_pump_power_term"] = field_htf_pump_power_term
-    terms_data["pc_htf_pump_power_term"] = pc_htf_pump_power_term
+    terms_data["hourly_energy_term"] = hourly_energy_cost_term
+    terms_data["field_htf_pump_power_term"] = field_htf_pump_power_cost_term
+    terms_data["pc_htf_pump_power_term"] = pc_htf_pump_power_cost_term
     terms_data["field_collector_tracking_power_term"] = (
-        field_collector_tracking_power_term
+        field_collector_tracking_power_cost_term
     )
-    terms_data["pc_startup_thermal_power_term"] = pc_startup_thermal_power_term
-    terms_data["field_piping_thermal_loss_term"] = field_piping_thermal_loss_term
-    terms_data["receiver_thermal_loss_term"] = receiver_thermal_loss_term
+    terms_data["pc_startup_thermal_power_term"] = pc_startup_thermal_power_cost_term
+    terms_data["field_piping_thermal_loss_term"] = field_piping_thermal_loss_cost_term
+    terms_data["receiver_thermal_loss_term"] = receiver_thermal_loss_cost_term
     terms_data["hour"] = hour_index
     terms_logbook = pd.DataFrame([terms_data])
 
     terms_logbook = terms_logbook.set_index("hour")
 
-    file_name = Path("results/terms_data.csv")
-    file_name.parent.mkdir(exist_ok=True)
+    terms_file_name = Path("results/terms_data.csv")
+    terms_file_name.parent.mkdir(exist_ok=True)
 
-    file_exists = file_name.exists()
-    terms_logbook.to_csv(file_name, mode="a", header=not file_exists)
+    file_exists = terms_file_name.exists()
+    terms_logbook.to_csv(terms_file_name, mode="a", header=not file_exists)
 
+    # return objective function value back
     return obj

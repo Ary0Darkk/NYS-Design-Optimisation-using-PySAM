@@ -140,3 +140,7 @@ Also I need to see checkpointing is happening regularly or not.Look for simulati
 
 2026-1-24
 I did caching. Now I need to see checkpointing and I noticed my workers get flushed after each hour, this can be one of the bottlenecks. Also trackio, I need to see.
+
+I need to completely local cause network error can crash optimisation runs. I am not using trackio, because it is not that flexible and I am not much familiar to trackio to.
+
+Now I have to focus on one thing get optimisation running correctly.
