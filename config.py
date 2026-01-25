@@ -19,7 +19,7 @@ CONFIG = {
     "is_tuning": False,
     # ---- optimiser -> choose "deap_ga" or "rl_optim"-------
     "optimiser": "deap_ga",  # Initial guess
-    "route": "operational",  # "design" or "operational" or "design_operational"
+    "route": "design_operational",  # "design" or "operational" or "design_operational"
     "resume_from_checkpoint": False,
     "refresh_cache": True,
     # "storage_block": "local-file-system/local-storage",
@@ -58,7 +58,7 @@ CONFIG = {
     },
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
-    "random_seed": 339,
+    "random_seed": 329,
     "tournament_size": 2,
     "pop_size": 4,  # polulation size
     "hall_of_fame_size": 2,  # elites we preserve from each gen
