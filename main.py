@@ -1,5 +1,4 @@
 import httpx
-
 from router import run_router
 from utilities.setup_custom_logger import setup_custom_logger
 

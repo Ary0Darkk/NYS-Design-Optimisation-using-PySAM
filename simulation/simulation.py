@@ -1,7 +1,6 @@
 import json
 import os
 import PySAM.TroughPhysical as TP
-import hashlib
 import tabulate as tb
 import time
 
@@ -27,32 +26,32 @@ LIGHT_GRAY = "\033[2m"
 _WARM_MODEL = None
 
 
-def canonicalize_overrides(overrides):
-    """this canonicalize the overrides
+# def canonicalize_overrides(overrides):
+#     """this canonicalize the overrides
 
-    Args:
-        overrides (dict): variables that need to overriden
+#     Args:
+#         overrides (dict): variables that need to overriden
 
-    Returns:
-        tuple: contains int and float based on type defined in override
-    """
-    return tuple(
-        sorted(
-            (
-                k,
-                int(v)
-                if isinstance(v, bool) or float(v).is_integer()
-                else round(float(v), 2),
-            )
-            for k, v in overrides.items()
-        )
-    )
+#     Returns:
+#         tuple: contains int and float based on type defined in override
+#     """
+#     return tuple(
+#         sorted(
+#             (
+#                 k,
+#                 int(v)
+#                 if isinstance(v, bool) or float(v).is_integer()
+#                 else round(float(v), 2),
+#             )
+#             for k, v in overrides.items()
+#         )
+#     )
 
 
-def simulation_cache_key(parameters):
-    canon = parameters["overrides"]
-    digest = hashlib.sha256(repr(canon).encode()).hexdigest()
-    return f"sim_{digest}"
+# def simulation_cache_key(parameters):
+#     canon = parameters["overrides"]
+#     digest = hashlib.sha256(repr(canon).encode()).hexdigest()
+#     return f"sim_{digest}"
 
 
 # setup the cache directory (it will be created automatically)

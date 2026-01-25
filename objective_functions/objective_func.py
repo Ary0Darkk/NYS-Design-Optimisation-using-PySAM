@@ -2,6 +2,9 @@ import pandas as pd
 from functools import cache
 from pathlib import Path
 from demand_data import get_dynamic_price
+from config import CONFIG
+
+timestamp = CONFIG["session_time"]
 
 
 @cache
@@ -109,8 +112,8 @@ def objective_function(
 
     value_data_logbook = value_data_logbook.set_index("hour")
 
-    value_data_file_name = Path("results/value_data.csv")
-    value_data_file_name.parent.mkdir(exist_ok=True)
+    value_data_file_name = Path(f"results/value/value_data_{timestamp}.csv")
+    value_data_file_name.parent.mkdir(parents=True, exist_ok=True)
 
     value_file_exists = value_data_file_name.exists()
     value_data_logbook.to_csv(
@@ -134,8 +137,8 @@ def objective_function(
 
     terms_logbook = terms_logbook.set_index("hour")
 
-    terms_file_name = Path("results/terms_data.csv")
-    terms_file_name.parent.mkdir(exist_ok=True)
+    terms_file_name = Path(f"results/terms/terms_data_{timestamp}.csv")
+    terms_file_name.parent.mkdir(parents=True, exist_ok=True)
 
     file_exists = terms_file_name.exists()
     terms_logbook.to_csv(terms_file_name, mode="a", header=not file_exists)

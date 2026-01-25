@@ -208,11 +208,12 @@ def train_rl(
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"
 
+            timestamp = CONFIG["session_time"]
             if optim_mode == "design":
-                file_name = Path("results/RL_design_results.csv")
+                file_name = Path(f"results/RL_results/RL_design_{timestamp}.csv")
             else:
-                file_name = Path("results/RL_operational_results.csv")
-            file_name.parent.mkdir(exist_ok=True)
+                file_name = Path(f"results/RL_results/RL_operational_{timestamp}.csv")
+            file_name.parent.mkdir(parents=True, exist_ok=True)
 
             file_exists = file_name.exists()
             result_logbook.to_csv(file_name, mode="a", header=not file_exists)
@@ -237,5 +238,4 @@ def train_rl(
         print("Interrupted by User!\nStopping...")
 
     finally:
-        # close worker pool
-        print(f"At sim hour = {hour_index} ")
+        print("Closed RL optimisation!")

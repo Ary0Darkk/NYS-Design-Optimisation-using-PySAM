@@ -7,7 +7,6 @@ import hashlib
 import logging
 from pathlib import Path
 import pickle
-from functools import partial
 import tabulate as tb
 
 from deap import base, creator, tools, algorithms
@@ -58,10 +57,6 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
     final_overrides = {**overrides_dyn, **static_overrides}
 
     sim_result = run_simulation(final_overrides)
-    # table = tb.tabulate(
-    #     [final_overrides.values()], headers=final_overrides.keys(), tablefmt="psql"
-    # )
-    # logger.info(f"Ran sim with paramters :\n{table}")
 
     if optim_mode == "design":
         try:
@@ -91,9 +86,7 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
     return (fitness,)
 
 
-# ============================================================
 # POPULATION EVALUATION
-# ============================================================
 def evaluate_population(toolbox, population):
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
@@ -104,11 +97,25 @@ def evaluate_population(toolbox, population):
     return len(invalid_ind)
 
 
-# ============================================================
-# MAIN GA TASK
-# ============================================================
+def init_fresh_ga(toolbox, pop_size):
+    """Encapsulates the logic for starting a brand-new evolution."""
+    logger.info("Starting fresh GA run")
+
+    # Set seeds from CONFIG for reproducibility
+    random.seed(CONFIG.get("random_seed"))
+    np.random.seed(CONFIG.get("random_seed"))
+
+    pop = toolbox.population(n=pop_size)
+    logbook = tools.Logbook()
+    logbook.header = ["gen", "nevals", "avg", "std", "max", "min"]
+
+    hof = tools.HallOfFame(maxsize=CONFIG.get("hall_of_fame_size"))
+
+    start_gen = 0
+    return pop, logbook, hof, start_gen
 
 
+# -------- MAIN GA TASK ----------------------
 def run_deap_ga_optimisation(
     override: dict,
     optim_mode: str,
@@ -138,11 +145,11 @@ def run_deap_ga_optimisation(
             var_types = override["types"]
             lb, ub = override["lb"], override["ub"]
 
-            pop_size = CONFIG["sol_per_pop"]
-            num_generations = CONFIG["num_generations"]
-            cxpb = CONFIG.get("cxpb", 0.5)
-            mutpb = CONFIG.get("mutpb", 0.2)
-            indpb = CONFIG.get("indpb", 0.2)
+            pop_size = CONFIG.get("pop_size")
+            num_generations = CONFIG.get("num_generations")
+            cxpb = CONFIG.get("cxpb")
+            mutpb = CONFIG.get("mutpb")
+            indpb = CONFIG.get("indpb")
 
             logger.info(f"Variables: {var_names}")
             logger.info(f"Types: {var_types}")
@@ -152,17 +159,13 @@ def run_deap_ga_optimisation(
             # DEAP setup
             # ----------------------------
             if not hasattr(creator, "FitnessMax"):
-                creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+                creator.create(
+                    "FitnessMax", base.Fitness, weights=(1.0,)
+                )  # 1.0 for maximising objective func
             if not hasattr(creator, "Individual"):
                 creator.create("Individual", list, fitness=creator.FitnessMax)
 
-            # init_worker(
-            #     var_names=var_names,
-            #     var_types=var_types,
-            #     lb=lb,
-            #     ub=ub,
-            #     static_overrides=static_overrides,
-            # )
+            # toolbox init
             toolbox = base.Toolbox()
 
             def gen_individual():
@@ -188,7 +191,7 @@ def run_deap_ga_optimisation(
             toolbox.register(
                 "select",
                 tools.selTournament,
-                tournsize=CONFIG.get("tournament_size", 3),
+                tournsize=CONFIG.get("tournament_size"),
             )
             toolbox.register("mate", tools.cxOnePoint)
 
@@ -202,36 +205,16 @@ def run_deap_ga_optimisation(
                             individual[i] += random.gauss(0, sigma)
 
                         individual[i] = max(lb[i], min(ub[i], individual[i]))
+                        # CRITICAL: Re-cast integers if they were contaminated by float math
+                        if var_types[i] is int:
+                            individual[i] = int(round(individual[i]))
                 return (individual,)
 
             toolbox.register("mutate", custom_mutation)
-            # toolbox.register(
-            #     "evaluate", partial(deap_fitness, optim_mode=optim_mode, hour=curr_hour)
-            # )
-
-            # ----------------------------
-            # Multiprocessing pool (spawn-safe)
-            # ----------------------------
-            # n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
-            # logger.info(f"{n_cores} cores working!")
-
-            # pool = Pool(
-            #     processes=n_cores,
-            #     initializer=init_worker,
-            #     initargs=(
-            #         var_names,
-            #         var_types,
-            #         lb,
-            #         ub,
-            #         static_overrides,
-            #     ),
-            # )
-
+            # pool mapping
             toolbox.register("map", pool.map)
 
-            # ----------------------------
-            # Stable checkpoint key
-            # ----------------------------
+            # ------- Stable checkpoint key ------------------
             ckpt_key = hashlib.sha256(
                 json.dumps(
                     {
@@ -252,42 +235,49 @@ def run_deap_ga_optimisation(
 
             resume_file = checkpoint_dir / "checkpoint_latest.pkl"
 
-            # ----------------------------
-            # Resume or fresh start
-            # ----------------------------
+            # ------- Resume or fresh start -----------------------
             if resume_file.exists() and CONFIG.get("resume_from_checkpoint", False):
-                logger.info(f"Resuming from {resume_file}")
-                with open(resume_file, "rb") as f:
-                    cp = pickle.load(f)
+                try:
+                    with open(resume_file, "rb") as f:
+                        cp = pickle.load(f)
 
-                pop = cp["pop"]
-                logbook = cp["logbook"]
-                hof = cp["hof"]
-                start_gen = cp["generation"] + 1
-                random.setstate(cp["rndstate"])
-                np.random.set_state(cp["np_rndstate"])
+                    # VALIDATION: Ensure checkpoint matches current config
+                    if cp.get("ckpt_key") != ckpt_key:
+                        logger.warning(
+                            "Checkpoint key mismatch! Starting fresh to avoid DNA corruption."
+                        )
+                        pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
+                    else:
+                        logger.info(
+                            f"Resuming from {resume_file} at generation {cp['generation']}"
+                        )
+                        pop = cp["pop"]
+                        logbook = cp["logbook"]
+                        hof = cp["hof"]
+                        start_gen = cp["generation"] + 1
+                        random.setstate(cp["rndstate"])
+                        np.random.set_state(cp["np_rndstate"])
+                except Exception as e:
+                    logger.error(f"Checkpoint corrupted: {e}. Starting fresh.")
+                    pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
             else:
-                logger.info("Starting fresh GA run")
-                random.seed(CONFIG.get("random_seed"))
-                np.random.seed(CONFIG.get("random_seed"))
+                pop, logbook, hof, start_gen = init_fresh_ga(
+                    toolbox, pop_size
+                )  # Standard Start
 
-                pop = toolbox.population(n=pop_size)
-                logbook = tools.Logbook()
-                logbook.header = ["gen", "nevals", "avg", "max"]
-                hof = tools.HallOfFame(maxsize=5)
-                start_gen = 0
-
-            stats = tools.Statistics(lambda ind: ind.fitness.values[0])
+            stats = tools.Statistics(
+                lambda ind: ind.fitness.values[0]
+            )  # take 0th-index because deap supports multi-objective function
             stats.register("avg", np.mean)
+            stats.register("std", np.std)
+            stats.register("min", np.min)
             stats.register("max", np.max)
 
             if start_gen == 0:
                 evaluate_population(toolbox, pop)
                 hof.update(pop)
 
-            # ----------------------------
-            # GA loop
-            # ----------------------------
+            # ----------- GA loop ------------------------------------
             for gen in range(start_gen, num_generations):
                 offspring = algorithms.varAnd(pop, toolbox, cxpb, mutpb)
                 nevals = evaluate_population(toolbox, offspring)
@@ -304,6 +294,10 @@ def run_deap_ga_optimisation(
                 )
 
                 cp_data = {
+                    "var_name": var_names,
+                    "var_types": var_types,
+                    "lb": lb,
+                    "ub": ub,
                     "pop": pop,
                     "logbook": logbook,
                     "hof": hof,
@@ -314,16 +308,14 @@ def run_deap_ga_optimisation(
 
                 atomic_pickle_dump(cp_data, resume_file)
 
-                if gen % CONFIG.get("checkpoint_interval", 2) == 0:
+                if gen % CONFIG.get("checkpoint_interval") == 0:
                     gen_file = checkpoint_dir / f"checkpoint_gen_{gen}.pkl"
                     atomic_pickle_dump(cp_data, gen_file)
                     mlflow.log_artifact(
                         str(gen_file), artifact_path="checkpoints/history"
                     )
 
-            # ----------------------------
-            # Final result
-            # ----------------------------
+            # ------ Final result ---------------------------------
             best_ind = hof[0]
             best_solution = [
                 var_types[i](
@@ -345,15 +337,14 @@ def run_deap_ga_optimisation(
                 {
                     "pop_size": pop_size,
                     "num_generations": num_generations,
+                    "indpb": indpb,
                     "cxpb": cxpb,
                     "mutpb": mutpb,
                     "checkpoint_key": ckpt_key,
                 }
             )
 
-            # ----------------------------
-            # Pretty console output (same style as your original code)
-            # ----------------------------
+            # ------ console output -------------------
             res_dict = {}
             header_line = "-" * 40
             if optim_mode == "design":
@@ -393,11 +384,12 @@ def run_deap_ga_optimisation(
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"
 
+            timestamp = CONFIG["session_time"]
             if optim_mode == "design":
-                file_name = Path("results/GA_design_results.csv")
+                file_name = Path(f"results/GA_results/GA_design_{timestamp}.csv")
             else:
-                file_name = Path("results/GA_operational_results.csv")
-            file_name.parent.mkdir(exist_ok=True)
+                file_name = Path(f"results/GA_results/GA_operational_{timestamp}.csv")
+            file_name.parent.mkdir(parents=True, exist_ok=True)
 
             file_exists = file_name.exists()
             result_logbook.to_csv(file_name, mode="a", header=not file_exists)
@@ -419,4 +411,4 @@ def run_deap_ga_optimisation(
         print("Interrupted by User!\nStopping...")
 
     finally:
-        print(f"At sim hour={curr_hour}")
+        print("Closed GA optimisation!")
