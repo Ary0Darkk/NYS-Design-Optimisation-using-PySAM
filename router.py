@@ -49,6 +49,7 @@ def call_optimiser(
     # initilise return variables
     x_opt = None
     f_val = None
+    o_metrices = None
 
     try:
         # optimisation
@@ -327,7 +328,7 @@ def run_router():
                             pool=global_pool,
                         )
 
-                        if optimals is not None:
+                        if optimals[0] is not None:
                             # Force every value to be a native Python float
                             static_override_dict = {
                                 name: float(val)
@@ -383,7 +384,7 @@ def run_router():
                         pool=rl_env,
                     )
 
-                    if optimals is not None:
+                    if optimals[0] is not None:
                         # Force every value to be a native Python float
                         static_override_dict = {
                             name: float(val)

@@ -22,6 +22,7 @@ NEW = "\033[0;36m"  # Cyan
 CACHED = "\033[0;32m"  # Green
 RESET = "\033[0m"  # No Color
 LIGHT_GRAY = "\033[2m"
+CRITICAL = "\033[0;31m" # red
 
 # def canonicalize_overrides(overrides):
 #     """this canonicalize the overrides
@@ -64,23 +65,33 @@ def run_simulation(overrides: dict):
     """
     # overrides = dict(sorted(overrides.items())) # sorted to ensure same order
 
-    start = time.time()
-    # run the actual simulation (joblib handles the loading)
-    result = _run_simulation_core(overrides)
-    duration = time.time() - start
+    duration =0
+    result = None
+    try:
+        start = time.time()
+        # run the actual simulation (joblib handles the loading)
+        result = _run_simulation_core(overrides)
+        penalty_flag = False
+        duration = time.time() - start
+    except Exception as e:
+        logger.info(f"{CRITICAL}[PENALISED]{RESET}Simulation exited with paramters : {overrides}")
+        logger.critical(f"Model exited with error: {e}")
+        penalty_flag = True
+        logger.info(f"Penalised with {CONFIG['penalty']:.0e} penality")
+    
     # Convert seconds to minutes and seconds
     mins, secs = divmod(duration, 60)
 
-    # is_cached = duration < 0.1
-    is_cached = _run_simulation_core.check_call_in_cache(overrides)
+    is_cached = duration < 0.2
+    # is_cached = _run_simulation_core.check_call_in_cache(overrides)
 
     # dynamic Logging & Table
     status_tag = f"{CACHED}[CACHED]{RESET}" if is_cached else f"{NEW}[NEW RUN]{RESET}"
 
-    table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
 
     # log message changes dynamically
     if not is_cached:
+        table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
         logger.info(
             f"{status_tag} [{int(mins)}m {secs:05.2f}s] New simulation :\n{table}"
         )
@@ -90,7 +101,7 @@ def run_simulation(overrides: dict):
             f"{status_tag} {LIGHT_GRAY}Hit - Parameters: {list(overrides.values())}{RESET}"
         )
 
-    return result
+    return result,penalty_flag
 
 
 @memory.cache

@@ -24,6 +24,7 @@ CONFIG = {
     "refresh_cache": True,
     # "storage_block": "local-file-system/local-storage",
     "num_cores": 4,
+    "penalty":-1e13,
     # ------ overrides --------------------------------------
     "design": {
         "overrides": [
@@ -35,8 +36,8 @@ CONFIG = {
             # "nSCA",  # number of SCA per loop
         ],
         # Bounds
-        "lb": [700_000, 2, 2, 1, 40],
-        "ub": [900_000, 20, 10, 10, 150],
+        "lb": [7000, 2, 2, 1, 40],
+        "ub": [9000, 20, 10, 10, 150],
         "types": [
             float,
             float,
@@ -58,14 +59,14 @@ CONFIG = {
     },
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
-    "random_seed": 329,
-    "tournament_size": 2,
-    "pop_size": 4,  # polulation size
-    "hall_of_fame_size": 2,  # elites we preserve from each gen
+    "random_seed": 44,
+    "tournament_size": 10,
+    "pop_size": 100,  # polulation size
+    "hall_of_fame_size": 5,  # elites we preserve from each gen
     "num_generations": 2,
-    "cxpb": 0.2,  # prob of mating an ind
-    "mutpb": 0.2,  # prob of mutating an ind
-    "indpb": 0.2,  # decides how much a chosen individual changes,generally 1/num of variables
+    "cxpb": 0.8,  # prob of mating an ind
+    "mutpb": 0.6,  # prob of mutating an ind
+    "indpb": 0.4,  # decides how much a chosen individual changes,generally 1/num of variables
     "verbose": True,
     # ------rl-based optimisation settings-------------------
     "rl_max_steps": 3,

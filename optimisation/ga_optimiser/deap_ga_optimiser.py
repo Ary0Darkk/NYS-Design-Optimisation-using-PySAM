@@ -56,11 +56,14 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
 
     final_overrides = {**overrides_dyn, **static_overrides}
 
-    sim_result = run_simulation(final_overrides)
+    sim_result,penality_flag = run_simulation(final_overrides)
 
     if optim_mode == "design":
         try:
-            obj = sim_result["annual_energy"]
+            if penality_flag is not True:
+                obj = sim_result["annual_energy"]
+            else:
+                obj = CONFIG["penalty"]
             return (obj,)
         except KeyError:
             # This will print the ACTUAL keys being returned by the cached task
@@ -69,16 +72,19 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
             )
             return (0.0,)  # Return a penalty score instead of crashing
     elif optim_mode == "operational":
-        obj = objective_function(
-            sim_result["hourly_energy"],
-            sim_result["pc_htf_pump_power"],
-            sim_result["field_htf_pump_power"],
-            sim_result["field_collector_tracking_power"],
-            sim_result["pc_startup_thermal_power"],
-            sim_result["field_piping_thermal_loss"],
-            sim_result["receiver_thermal_loss"],
-            hour_index=hour,
-        )
+        if penality_flag is not True:
+            obj = objective_function(
+                sim_result["hourly_energy"],
+                sim_result["pc_htf_pump_power"],
+                sim_result["field_htf_pump_power"],
+                sim_result["field_collector_tracking_power"],
+                sim_result["pc_startup_thermal_power"],
+                sim_result["field_piping_thermal_loss"],
+                sim_result["receiver_thermal_loss"],
+                hour_index=hour,
+            )
+        else:
+            obj = CONFIG["penalty"]
     else:
         print(f"{optim_mode} is invalid!")
 
