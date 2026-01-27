@@ -227,7 +227,7 @@ def run_deap_ga_optimisation(
                         else:
                             # Round to 2 decimal places for floats
                             individual[i] = round(float(individual[i]), 2)
-                
+
                 return (individual,)
 
             toolbox.register("mutate", custom_mutation)
