@@ -111,7 +111,7 @@ def get_dynamic_price() -> pd.DataFrame:
 def save_data():
     final_dataset = get_dynamic_price()
 
-    final_dataset.to_csv(Path("electricity_data/dynamic_price_data"))
+    final_dataset.to_csv(Path("electricity_data/dynamic_price_data.csv"))
 
 
 if __name__ == "__main__":

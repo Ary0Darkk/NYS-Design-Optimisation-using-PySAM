@@ -24,7 +24,7 @@ CONFIG = {
     "refresh_cache": True,
     # "storage_block": "local-file-system/local-storage",
     "num_cores": 4,
-    "penalty":-1e13,
+    "penalty": -1e13,
     # ------ overrides --------------------------------------
     "design": {
         "overrides": [
@@ -33,7 +33,6 @@ CONFIG = {
             "ColperSCA",  # num of modules per SCA
             "W_aperture",  # width of SCA
             "L_SCA",  # length of collector assembly
-            # "nSCA",  # number of SCA per loop
         ],
         # Bounds
         "lb": [7000, 2, 2, 1, 40],
@@ -60,10 +59,10 @@ CONFIG = {
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
     "random_seed": 44,
-    "tournament_size": 10,
-    "pop_size": 100,  # polulation size
+    "tournament_size": 7,
+    "pop_size": 10,  # polulation size
     "hall_of_fame_size": 5,  # elites we preserve from each gen
-    "num_generations": 2,
+    "num_generations": 4,
     "cxpb": 0.8,  # prob of mating an ind
     "mutpb": 0.6,  # prob of mutating an ind
     "indpb": 0.4,  # decides how much a chosen individual changes,generally 1/num of variables

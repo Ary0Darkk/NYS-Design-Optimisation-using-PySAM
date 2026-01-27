@@ -22,7 +22,7 @@ NEW = "\033[0;36m"  # Cyan
 CACHED = "\033[0;32m"  # Green
 RESET = "\033[0m"  # No Color
 LIGHT_GRAY = "\033[2m"
-CRITICAL = "\033[0;31m" # red
+CRITICAL = "\033[0;31m"  # red
 
 # def canonicalize_overrides(overrides):
 #     """this canonicalize the overrides
@@ -54,8 +54,8 @@ CRITICAL = "\033[0;31m" # red
 
 # setup the cache directory (it will be created automatically)
 # Setting mmap_mode='r' makes it very fast for large arrays
-cachedir = os.path.join(os.getcwd(), "sim_cache")
-memory = Memory(cachedir, verbose=0, mmap_mode="r")
+# cachedir = os.path.join(os.getcwd(), "sim_cache")
+# memory = Memory(cachedir, verbose=0, mmap_mode="r")
 
 
 def run_simulation(overrides: dict):
@@ -65,46 +65,48 @@ def run_simulation(overrides: dict):
     """
     # overrides = dict(sorted(overrides.items())) # sorted to ensure same order
 
-    duration =0
+    duration = 0
     result = None
     try:
         start = time.time()
         # run the actual simulation (joblib handles the loading)
         result = _run_simulation_core(overrides)
-        penalty_flag = False
+        penalty_flag = False  # flag for penality; pysam model not executed
         duration = time.time() - start
+        # Convert seconds to minutes and seconds
+        mins, secs = divmod(duration, 60)
+        # log message
+        table = tb.tabulate(
+            [overrides.values()], headers=overrides.keys(), tablefmt="psql"
+        )
+        logger.info(
+            f"{NEW}[NEW RUN]{RESET} [{int(mins)}m {secs:05.2f}s] Ran sim with params :\n{table}"
+        )
     except Exception as e:
-        logger.info(f"{CRITICAL}[PENALISED]{RESET}Simulation exited with paramters : {overrides}")
+        logger.critical(f"Sim exited with params : {overrides}")
         logger.critical(f"Model exited with error: {e}")
         penalty_flag = True
-        logger.info(f"Penalised with {CONFIG['penalty']:.0e} penality")
-    
-    # Convert seconds to minutes and seconds
-    mins, secs = divmod(duration, 60)
+        logger.info(
+            f"{CRITICAL}[PENALISED]{RESET}Penalised with {CONFIG['penalty']:.0e} penality"
+        )
 
-    is_cached = duration < 0.2
+    # is_cached = duration < 0.2
     # is_cached = _run_simulation_core.check_call_in_cache(overrides)
 
     # dynamic Logging & Table
-    status_tag = f"{CACHED}[CACHED]{RESET}" if is_cached else f"{NEW}[NEW RUN]{RESET}"
-
+    # status_tag = f"{CACHED}[CACHED]{RESET}" if is_cached else f"{NEW}[NEW RUN]{RESET}"
 
     # log message changes dynamically
-    if not is_cached:
-        table = tb.tabulate([overrides.values()], headers=overrides.keys(), tablefmt="psql")
-        logger.info(
-            f"{status_tag} [{int(mins)}m {secs:05.2f}s] New simulation :\n{table}"
-        )
-    else:
-        # Optional: Just a one-line log for hits to keep the file clean
-        logger.info(
-            f"{status_tag} {LIGHT_GRAY}Hit - Parameters: {list(overrides.values())}{RESET}"
-        )
+    # if not is_cached:
+    # else:
+    # Optional: Just a one-line log for hits to keep the file clean
+    # logger.info(
+    # f"{status_tag} {LIGHT_GRAY}Hit - Parameters: {list(overrides.values())}{RESET}"
+    # )
 
-    return result,penalty_flag
+    return result, penalty_flag
 
 
-@memory.cache
 def _run_simulation_core(overrides: dict):
     overrides = dict(overrides)
 

@@ -1,5 +1,5 @@
 import pandas as pd
-from functools import cache
+from functools import lru_cache
 from pathlib import Path
 from demand_data import get_dynamic_price
 from config import CONFIG
@@ -7,9 +7,9 @@ from config import CONFIG
 timestamp = CONFIG["session_time"]
 
 
-@cache
+@lru_cache(maxsize=1)
 def get_cached_dynamic_price():
-    file_path = Path("electricity_data/dynamic_price_data")
+    file_path = Path("electricity_data/dynamic_price_data.csv")
     if file_path.exists():
         df = pd.read_csv(file_path)
         return df["dynamic_price"].values

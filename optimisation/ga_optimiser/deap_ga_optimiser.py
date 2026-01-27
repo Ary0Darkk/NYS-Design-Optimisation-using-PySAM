@@ -45,9 +45,7 @@ def init_worker(
     _GA_STATIC_OVERRIDES = static_overrides
 
 
-# ============================================================
-# FITNESS FUNCTION (MUST BE TOP-LEVEL)
-# ============================================================
+# fitness function
 def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_overrides):
     # Use the passed-in variables instead of Globals
     overrides_dyn = {
@@ -56,7 +54,7 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
 
     final_overrides = {**overrides_dyn, **static_overrides}
 
-    sim_result,penality_flag = run_simulation(final_overrides)
+    sim_result, penality_flag = run_simulation(final_overrides)
 
     if optim_mode == "design":
         try:
@@ -92,7 +90,7 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
     return (fitness,)
 
 
-# POPULATION EVALUATION
+# population evaluation
 def evaluate_population(toolbox, population):
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
@@ -161,9 +159,7 @@ def run_deap_ga_optimisation(
             logger.info(f"Types: {var_types}")
             logger.info(f"Bounds: {list(zip(lb, ub))}")
 
-            # ----------------------------
             # DEAP setup
-            # ----------------------------
             if not hasattr(creator, "FitnessMax"):
                 creator.create(
                     "FitnessMax", base.Fitness, weights=(1.0,)
@@ -174,8 +170,20 @@ def run_deap_ga_optimisation(
             # toolbox init
             toolbox = base.Toolbox()
 
+            # individual generation
             def gen_individual():
-                return [random.uniform(lb[i], ub[i]) for i in range(len(var_names))]
+                individual = []
+                for i in range(len(var_names)):
+                    if var_types[i] is int:
+                        val = random.randint(lb[i], ub[i])
+                    else:
+                        # Scale by 100 to get 2 decimal places
+                        # e.g., for range 0 to 10, pick a random int between 0 and 1000, then / 100
+                        scaled_lb = int(lb[i] * 100)
+                        scaled_ub = int(ub[i] * 100)
+                        val = random.randrange(scaled_lb, scaled_ub + 1) / 100.0
+                    individual.append(val)
+                return individual
 
             toolbox.register(
                 "individual",
@@ -210,10 +218,16 @@ def run_deap_ga_optimisation(
                             sigma = 0.1 * (ub[i] - lb[i])
                             individual[i] += random.gauss(0, sigma)
 
+                        # clip to boundaries
                         individual[i] = max(lb[i], min(ub[i], individual[i]))
-                        # CRITICAL: Re-cast integers if they were contaminated by float math
+
+                        # handle types and precision
                         if var_types[i] is int:
                             individual[i] = int(round(individual[i]))
+                        else:
+                            # Round to 2 decimal places for floats
+                            individual[i] = round(float(individual[i]), 2)
+                
                 return (individual,)
 
             toolbox.register("mutate", custom_mutation)
