@@ -9,6 +9,7 @@ from pathlib import Path
 import pickle
 import tabulate as tb
 import time
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
@@ -21,6 +22,13 @@ from simulation import run_simulation
 from objective_functions import objective_function
 
 logger = logging.getLogger("NYS_Optimisation")
+
+# Try Qt5Agg first, it's the most robust for Linux
+try:
+    matplotlib.use('Qt5Agg')
+except:
+    # Fallback to TkAgg if Qt5 isn't installed
+    matplotlib.use('TkAgg')
 
 
 # ----------------------------
