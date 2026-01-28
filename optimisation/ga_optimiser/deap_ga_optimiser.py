@@ -8,10 +8,14 @@ import logging
 from pathlib import Path
 import pickle
 import tabulate as tb
+import time
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
 from deap import base, creator, tools, algorithms
 
 from utilities.checkpointing import atomic_pickle_dump
+from utilities.graph_plotter import create_live_plot
 from config import CONFIG
 from simulation import run_simulation
 from objective_functions import objective_function
@@ -129,6 +133,7 @@ def run_deap_ga_optimisation(
     pool,
 ):
     try:
+        timestamp = CONFIG["session_time"]
         if optim_mode == "design":
             run_name = "GA_Design_optimisation"
         else:
@@ -248,12 +253,32 @@ def run_deap_ga_optimisation(
                 ).encode()
             ).hexdigest()[:12]
 
-            checkpoint_dir = (
-                Path(__file__).resolve().parents[1] / "checkpoints" / ckpt_key
-            )
-            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            def safe_pickle_save(data, file_path):
+                """Directly saves pickle with a retry mechanism for Windows locking."""
+                for attempt in range(3):
+                    try:
+                        with open(file_path, "wb") as f:
+                            pickle.dump(data, f)
+                        return True  # Success
+                    except (PermissionError, FileNotFoundError) as e:
+                        if attempt < 2:
+                            time.sleep(0.2)  # Wait for OS lock to release
+                            continue
+                        logger.warning(f"Final Save Attempt Failed: {e}")
+                return False
 
-            resume_file = checkpoint_dir / "checkpoint_latest.pkl"
+            # checkpoint_dir = (
+            #     Path(__file__).resolve().parents[1] / "checkpoints" / ckpt_key
+            # )
+
+            # BASE_DIR = Path(__file__).resolve().parents[1] # Directory of the current script
+            if optim_mode == "design":
+                checkpoint_dir = Path(f"checkpoints/GA/GA_design/{ckpt_key}")
+            else:
+                checkpoint_dir = Path(f"checkpoints/GA/GA_operational/{ckpt_key}")
+
+            resume_file = Path(f"{checkpoint_dir}/checkpoint_latest.pkl")
+            resume_file.parent.mkdir(parents=True, exist_ok=True)
 
             # ------- Resume or fresh start -----------------------
             if resume_file.exists() and CONFIG.get("resume_from_checkpoint", False):
@@ -297,6 +322,30 @@ def run_deap_ga_optimisation(
                 evaluate_population(toolbox, pop)
                 hof.update(pop)
 
+            # init everything before loop execution
+            gens_log = []
+            max_fitness_log = []
+            avg_fitness_log = []
+
+            plt.ion()  # turn on Interactive Mode
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+            # Styling: Light background color
+            ax.set_facecolor("#98c6f5")  # Light grey/white background
+            fig.patch.set_facecolor("#ffffff")  # White outer border
+
+            ax.set_xlim(start_gen, num_generations)
+            # Set X-axis units to 1
+            ax.xaxis.set_major_locator(MultipleLocator(1))
+            (max_line,) = ax.plot([], [], "r-", label="Max Fitness", lw=2)
+            (avg_line,) = ax.plot([], [], "b--", label="Avg Fitness", alpha=0.6)
+
+            ax.set_title("Fitness vs Generation")
+            ax.set_xlabel("Generation")
+            ax.set_ylabel("Fitness Value")
+            ax.legend()
+            ax.grid(True, linestyle=":", alpha=0.6, color="white")
+
             # ----------- GA loop ------------------------------------
             for gen in range(start_gen, num_generations):
                 offspring = algorithms.varAnd(pop, toolbox, cxpb, mutpb)
@@ -307,6 +356,28 @@ def run_deap_ga_optimisation(
 
                 record = stats.compile(pop)
                 logbook.record(gen=gen, nevals=nevals, **record)
+
+                # update data logs
+                gens_log.append(gen)
+                max_fitness_log.append(record["max"])
+                avg_fitness_log.append(record["avg"])
+
+                # update the existing plot
+                max_line.set_data(gens_log, max_fitness_log)
+                avg_line.set_data(gens_log, avg_fitness_log)
+
+                # safe rescaling
+                if len(gens_log) > 1:
+                    # We only autoscale Y, because X limit is fixed by you
+                    ax.relim()
+                    ax.autoscale_view(scalex=False, scaley=True)
+
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+
+                    # INCREASE PAUSE: Since you are using multiprocessing,
+                    # the UI needs more time to process events.
+                    plt.pause(0.2)
 
                 mlflow.log_metrics(
                     {"gen_avg": record["avg"], "gen_max": record["max"]},
@@ -326,14 +397,56 @@ def run_deap_ga_optimisation(
                     "np_rndstate": np.random.get_state(),
                 }
 
-                atomic_pickle_dump(cp_data, resume_file)
+                try:
+                    # saves "latest" checkpoint
+                    safe_pickle_save(cp_data, resume_file)
 
-                if gen % CONFIG.get("checkpoint_interval") == 0:
-                    gen_file = checkpoint_dir / f"checkpoint_gen_{gen}.pkl"
-                    atomic_pickle_dump(cp_data, gen_file)
-                    mlflow.log_artifact(
-                        str(gen_file), artifact_path="checkpoints/history"
-                    )
+                    # Periodic history checkpoint
+                    if gen % CONFIG.get("checkpoint_interval", 5) == 0:
+                        gen_file = Path(f"{checkpoint_dir}/checkpoint_gen_{gen}.pkl")
+                        gen_file.parent.mkdir(parents=True, exist_ok=True)
+                        safe_pickle_save(cp_data, gen_file)
+                        mlflow.log_artifact(
+                            str(gen_file), artifact_path="checkpoints/history"
+                        )
+                except Exception as e:
+                    logger.warning(f"Checkpoint write failed (Generation {gen}): {e}")
+
+                # def save_to_json(cp_data,file_name):
+                #     with open(file_name, "w") as f:
+                #         json.dump(cp_data, f, indent=4)
+
+                # # Save the "latest" checkpoint directly
+                # save_to_json(cp_data, resume_file)
+
+                # # Periodic history checkpoint
+                # if gen % CONFIG.get("checkpoint_interval", 5) == 0:
+                #     gen_file = Path(f"{checkpoint_dir}/ checkpoint_gen_{gen}.json")
+                #     gen_file.parent.mkdir(parents=True, exist_ok=True)
+                #     save_to_json(cp_data, gen_file)
+
+                #     # Ensure file is written before logging to MLflow
+                #     if gen_file.exists():
+                #         mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
+
+            # after loop ends
+            plt.ioff()  # Turn off interactive mode
+
+            # save as a static image at the end
+            if optim_mode == "design":
+                file_name = Path(
+                    f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
+                )
+            else:
+                file_name = Path(
+                    f"plots/GA_plots/GA_operational_fitness_vs_gen_{timestamp}.png"
+                )
+            file_name.parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(fname=file_name)
+            # plt.show() # blocks execution of code
+
+            plt.draw()
+            plt.pause(1)
 
             # ------ Final result ---------------------------------
             best_ind = hof[0]
@@ -404,7 +517,6 @@ def run_deap_ga_optimisation(
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"
 
-            timestamp = CONFIG["session_time"]
             if optim_mode == "design":
                 file_name = Path(f"results/GA_results/GA_design_{timestamp}.csv")
             else:

@@ -10,6 +10,7 @@ dependencies = [
     "deap>=1.4.3",
     "dvc>=3.64.2",
     # "matlabengine>=25.2.2",
+    "matplotlib>=3.10.7",
     "mlflow>=3.6.0",
     "nlopt>=2.9.1",
     "nrel-pysam>=7.1.0",

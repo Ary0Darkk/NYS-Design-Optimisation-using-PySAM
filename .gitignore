@@ -27,3 +27,4 @@ logs
 sim_cache
 mlflow.db
 mlartifacts
+plots
