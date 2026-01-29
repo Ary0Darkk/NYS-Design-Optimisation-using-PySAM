@@ -1,5 +1,4 @@
 import json
-import os
 import PySAM.TroughPhysical as TP
 import tabulate as tb
 import time
@@ -9,7 +8,6 @@ from utilities.list_nesting import replace_1st_order
 from utilities.setup_custom_logger import setup_custom_logger
 
 import logging
-from joblib import Memory
 
 # Set up logging if not already done
 if not logging.getLogger("NYS_Optimisation").hasHandlers():

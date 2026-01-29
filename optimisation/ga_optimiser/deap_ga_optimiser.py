@@ -25,10 +25,10 @@ logger = logging.getLogger("NYS_Optimisation")
 
 # Try Qt5Agg first, it's the most robust for Linux
 try:
-    matplotlib.use('Qt5Agg')
+    matplotlib.use("Qt5Agg")
 except:
     # Fallback to TkAgg if Qt5 isn't installed
-    matplotlib.use('TkAgg')
+    matplotlib.use("TkAgg")
 
 
 # ----------------------------
@@ -400,6 +400,7 @@ def run_deap_ga_optimisation(
                     "pop": pop,
                     "logbook": logbook,
                     "hof": hof,
+                    "ckpt_key": ckpt_key,
                     "generation": gen,
                     "rndstate": random.getstate(),
                     "np_rndstate": np.random.get_state(),
