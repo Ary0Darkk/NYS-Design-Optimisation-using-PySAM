@@ -335,24 +335,28 @@ def run_deap_ga_optimisation(
             max_fitness_log = []
             avg_fitness_log = []
 
-            plt.ion()  # turn on Interactive Mode
-            fig, ax = plt.subplots(figsize=(10, 6))
+            fig, ax = None, None  # Initialize as None
+            max_line, avg_line = None, None
+            plot_initialized = False
 
-            # Styling: Light background color
-            ax.set_facecolor("#98c6f5")  # Light grey/white background
-            fig.patch.set_facecolor("#ffffff")  # White outer border
+            # plt.ion()  # turn on Interactive Mode
+            # fig, ax = plt.subplots(figsize=(10, 6))
 
-            ax.set_xlim(start_gen, num_generations)
-            # Set X-axis units to 1
-            ax.xaxis.set_major_locator(MultipleLocator(1))
-            (max_line,) = ax.plot([], [], "r-", label="Max Fitness", lw=2)
-            (avg_line,) = ax.plot([], [], "b--", label="Avg Fitness", alpha=0.6)
+            # # Styling: Light background color
+            # ax.set_facecolor("#98c6f5")  # Light grey/white background
+            # fig.patch.set_facecolor("#ffffff")  # White outer border
 
-            ax.set_title("Fitness vs Generation")
-            ax.set_xlabel("Generation")
-            ax.set_ylabel("Fitness Value")
-            ax.legend()
-            ax.grid(True, linestyle=":", alpha=0.6, color="white")
+            # ax.set_xlim(start_gen, num_generations)
+            # # Set X-axis units to 1
+            # ax.xaxis.set_major_locator(MultipleLocator(1))
+            # (max_line,) = ax.plot([], [], "r-", label="Max Fitness", lw=2)
+            # (avg_line,) = ax.plot([], [], "b--", label="Avg Fitness", alpha=0.6)
+
+            # ax.set_title("Fitness vs Generation")
+            # ax.set_xlabel("Generation")
+            # ax.set_ylabel("Fitness Value")
+            # ax.legend()
+            # ax.grid(True, linestyle=":", alpha=0.6, color="white")
 
             # ----------- GA loop ------------------------------------
             for gen in range(start_gen, num_generations):
@@ -370,22 +374,45 @@ def run_deap_ga_optimisation(
                 max_fitness_log.append(record["max"])
                 avg_fitness_log.append(record["avg"])
 
-                # update the existing plot
-                max_line.set_data(gens_log, max_fitness_log)
-                avg_line.set_data(gens_log, avg_fitness_log)
+                # # update the existing plot
+                # max_line.set_data(gens_log, max_fitness_log)
+                # avg_line.set_data(gens_log, avg_fitness_log)
 
                 # safe rescaling
-                if len(gens_log) > 1:
-                    # We only autoscale Y, because X limit is fixed by you
-                    ax.relim()
-                    ax.autoscale_view(scalex=False, scaley=True)
+                if len(gens_log) >= 2:
+                    if not plot_initialized:
+                        # Initialize plot ONLY when we have 2 points
+                        plt.ion()
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        ax.set_facecolor("#98c6f5")
+                        
+                        # Setup lines
+                        (max_line,) = ax.plot(gens_log, max_fitness_log, "r-", label="Max Fitness", lw=2)
+                        (avg_line,) = ax.plot(gens_log, avg_fitness_log, "b--", label="Avg Fitness", alpha=0.6)
+                        
+                        # Formatting
+                        ax.set_title("Fitness vs Generation")
+                        ax.legend()
+                        plot_initialized = True
+                        print(f"Plotting initialized at Generation {gen}")
+                    else:
+                        # Just update existing lines
+                        max_line.set_data(gens_log, max_fitness_log)
+                        avg_line.set_data(gens_log, avg_fitness_log)
+                        
+                        # 2. Rescale efficiently
+                        ax.relim()
+                        ax.autoscale_view()
 
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
+                        # 3. FAST DRAW: Only redraw the lines and the axis area
+                        # Avoid fig.canvas.draw() if possible
+                        ax.draw_artist(ax.patch) # Redraw the background color/grid
+                        ax.draw_artist(max_line) # Redraw the red line
+                        ax.draw_artist(avg_line) # Redraw the blue line
 
-                    # INCREASE PAUSE: Since you are using multiprocessing,
-                    # the UI needs more time to process events.
-                    plt.pause(0.2)
+                        # 4. Push updates to the window
+                        fig.canvas.blit(ax.bbox) 
+                        fig.canvas.flush_events()
 
                 mlflow.log_metrics(
                     {"gen_avg": record["avg"], "gen_max": record["max"]},
@@ -454,8 +481,9 @@ def run_deap_ga_optimisation(
             fig.savefig(fname=file_name)
             # plt.show() # blocks execution of code
 
-            plt.draw()
-            plt.pause(1)
+            # plt.draw()
+            # plt.pause(1)
+            plt.close()
 
             # ------ Final result ---------------------------------
             best_ind = hof[0]
