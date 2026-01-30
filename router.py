@@ -7,11 +7,8 @@ from optimisation.rl_optimiser.rl_tuner import run_rl_study
 from config import CONFIG
 import mlflow
 import dagshub
-from multiprocessing import Pool, cpu_count
 
 import logging
-from optimisation.rl_optimiser.ppo_rl_training import make_env
-from stable_baselines3.common.vec_env import SubprocVecEnv
 
 logger = logging.getLogger("NYS_Optimisation")
 
@@ -37,7 +34,6 @@ def call_optimiser(
     optim_mode: str,
     is_nested: bool,
     target_hour: int,
-    pool,
     static_overrides: Optional[dict[str, float]] = None,
 ):
     # FIXME : try and catch is not working as expected,
@@ -72,7 +68,6 @@ def call_optimiser(
                 static_overrides=static_overrides,
                 is_nested=is_nested,
                 curr_hour=target_hour,
-                pool=pool,
             )
         elif opt_type == "rl_optim":
             x_opt, f_val, o_metrices = train_rl(
@@ -81,7 +76,6 @@ def call_optimiser(
                 static_overrides=static_overrides,
                 is_nested=is_nested,
                 hour_index=target_hour,
-                env=pool,
             )
         else:
             print(f"{opt_type} : Not a valid optimiser name in CONFIG")
@@ -111,29 +105,21 @@ def run_hourly_optimisation(
     override: dict[str, list[float]],
     optim_mode: str,
     is_nested: bool,
-    pool,
     static_overrides: Optional[dict[str, float]] = None,
 ):
     results = {}
-    try:
-        for hour in range(1, 8761):
-            print(f"\n{'-' * 40}\nOptimising for hour {hour}\n{'-' * 40}")
+    for hour in range(1, 8761):
+        print(f"\n{'-' * 40}\nOptimising for hour {hour}\n{'-' * 40}")
 
-            best_x, best_f, _ = call_optimiser(
-                override=override,
-                optim_mode=optim_mode,
-                static_overrides=static_overrides,
-                is_nested=is_nested,
-                target_hour=hour,
-                pool=pool,
-            )
+        best_x, best_f, _ = call_optimiser(
+            override=override,
+            optim_mode=optim_mode,
+            static_overrides=static_overrides,
+            is_nested=is_nested,
+            target_hour=hour,
+        )
 
-            results[hour] = {"best_solution": best_x, "best_fitness": best_f}
-    except KeyboardInterrupt:
-        logger.warning(f"\nStopped at hour {hour} by user.")
-        # We do NOT close the pool here; we let 'finally' or the caller handle it
-        # so we don't accidentally close a pool that might be needed for cleanup
-        raise
+        results[hour] = {"best_solution": best_x, "best_fitness": best_f}
 
     return results
 
@@ -156,7 +142,6 @@ def run_router():
 
         call_tuner(override=CONFIG["design"])
     else:
-        rl_env = None
         # optimisation
         opt_type = CONFIG.get("optimiser")
 
@@ -174,78 +159,14 @@ def run_router():
 
         # --------- design route ------------------------------------------------
         if route == "design":
-            if opt_type == "deap_ga":
-                # initialize the Pool ONCE at the start
-                n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
-                logger.info(f"Initializing persistent pool with {n_cores} cores.")
-                logger.info(f"{route} optimisation started !")
-                global_pool = Pool(processes=n_cores)
-                try:
-                    # print(f"Optimisation of : {override}")
-                    call_optimiser(
-                        override=CONFIG[route],
-                        target_hour=1,
-                        optim_mode=route,
-                        is_nested=False,
-                        pool=global_pool,
-                    )
-                except KeyboardInterrupt:
-                    logger.warning(
-                        "\nParent process received interrupt. Terminating workers..."
-                    )
-                    global_pool.terminate()  # Instantly kill all workers
-                    global_pool.join()
-                    logger.info("Pool terminated successfully.")
-                    raise  # Re-raise to stop the entire script
-                finally:
-                    global_pool.close()
-                    global_pool.join()
-                    logger.info(f"Closed {n_cores} workers pool!")
-
-            elif opt_type == "rl_optim":
-                logger.info(f"{route} optimisation started !")
-                num_envs = min(4, cpu_count())
-                logger.info(
-                    f"Launching {num_envs} persistent RL worker environments..."
-                )
-                try:
-                    # Initialize env once with hour 1
-                    override = CONFIG[route]
-                    rl_env = SubprocVecEnv(
-                        [
-                            make_env(
-                                override["overrides"],
-                                override["types"],
-                                override["lb"],
-                                override["ub"],
-                                {},
-                                1,
-                                CONFIG["rl_max_steps"],
-                                optim_mode=route,
-                            )
-                            for _ in range(num_envs)
-                        ]
-                    )
-                    # calls optimiser
-                    call_optimiser(
-                        override=override,
-                        target_hour=1,
-                        optim_mode=route,
-                        is_nested=False,
-                        pool=rl_env,
-                    )
-                except KeyboardInterrupt:
-                    logger.warning("User interrupted the process.")
-
-                finally:
-                    # catch-all cleanup
-                    if rl_env is not None:
-                        logger.info("Terminating RL environments...")
-                        rl_env.close()
-                        logger.info("RL environments closed.")
-
-            else:
-                logger.info(f"{opt_type} is not a valid optimiser!")
+            logger.info(f"{route} optimisation started !")
+            # print(f"Optimisation of : {override}")
+            call_optimiser(
+                override=CONFIG[route],
+                target_hour=1,
+                optim_mode=route,
+                is_nested=False,
+            )
 
         # --------- operational ---------------------------------------------------
         elif route == "operational":
@@ -253,74 +174,12 @@ def run_router():
 
             with mlflow.start_run(run_name="Operational optimisation"):
                 logger.info(f"{route} optimisation started !")
-                if opt_type == "deap_ga":
-                    # initialize the Pool ONCE at the start
-                    n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
-                    logger.info(f"Initializing persistent pool with {n_cores} cores.")
-                    global_pool = Pool(processes=n_cores)
-                    try:
-                        # print(f"Optimisation of : {override}")
-                        run_hourly_optimisation(
-                            override=CONFIG[route],
-                            optim_mode="operational",
-                            is_nested=is_nested,
-                            pool=global_pool,
-                        )
-                    except KeyboardInterrupt:
-                        logger.warning(
-                            "\nParent process received interrupt. Terminating workers..."
-                        )
-                        global_pool.terminate()  # Instantly kill all workers
-                        global_pool.join()
-                        logger.info("Pool terminated successfully.")
-                        raise  # Re-raise to stop the entire script
-                    finally:
-                        global_pool.close()
-                        global_pool.join()
-                        logger.info(f"Closed {n_cores} workers pool!")
-
-                elif opt_type == "rl_optim":
-                    num_envs = min(4, cpu_count())
-                    logger.info(
-                        f"Launching {num_envs} persistent RL worker environments..."
-                    )
-                    try:
-                        # Initialize env once with hour 1
-                        override = CONFIG[route]
-                        rl_env = SubprocVecEnv(
-                            [
-                                make_env(
-                                    override["overrides"],
-                                    override["types"],
-                                    override["lb"],
-                                    override["ub"],
-                                    {},
-                                    1,
-                                    CONFIG["rl_max_steps"],
-                                    optim_mode="operational",
-                                )
-                                for _ in range(num_envs)
-                            ]
-                        )
-                        # print(f"Optimisation of : {override}")
-                        run_hourly_optimisation(
-                            override=override,
-                            optim_mode="operational",
-                            is_nested=is_nested,
-                            pool=rl_env,
-                        )
-                    except KeyboardInterrupt:
-                        logger.warning("User interrupted the process.")
-
-                    finally:
-                        # catch-all cleanup
-                        if rl_env is not None:
-                            logger.info("Terminating RL environments...")
-                            rl_env.close()
-                            logger.info("RL environments closed.")
-
-                else:
-                    logger.info(f"{opt_type} is not a valid optimiser!")
+                # print(f"Optimisation of : {override}")
+                run_hourly_optimisation(
+                    override=CONFIG[route],
+                    optim_mode=route,
+                    is_nested=is_nested,
+                )
 
         # ------------ design + operational -----------------------------------------------
         # perform both optim in sequence
@@ -331,139 +190,32 @@ def run_router():
                 logger.info(
                     "Going to begin Design plus Operational optimisation sequentially!\n\n"
                 )
-                if opt_type == "deap_ga":
-                    logger.info("Design optimisation started !")
-                    # initialize the Pool ONCE at the start
-                    n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
-                    logger.info(f"Initializing persistent pool with {n_cores} cores.")
-                    global_pool = Pool(processes=n_cores)
+                logger.info("Design optimisation started !")
+                # print(f"Optimisation of : {override}")
+                optimals = call_optimiser(
+                    override=CONFIG["design"],
+                    optim_mode="design",
+                    target_hour=1,
+                    is_nested=is_nested,
+                )
 
-                    try:
-                        # print(f"Optimisation of : {override}")
-                        optimals = call_optimiser(
-                            override=CONFIG["design"],
-                            optim_mode="design",
-                            target_hour=1,
-                            is_nested=is_nested,
-                            pool=global_pool,
-                        )
+                if optimals[0] is not None:
+                    # Force every value to be a native Python float
+                    static_override_dict = {
+                        name: float(val)
+                        for name, val in zip(CONFIG["design"]["overrides"], optimals[0])
+                    }
 
-                        if optimals[0] is not None:
-                            # Force every value to be a native Python float
-                            static_override_dict = {
-                                name: float(val)
-                                for name, val in zip(
-                                    CONFIG["design"]["overrides"], optimals[0]
-                                )
-                            }
-
-                            logger.info("Operational optimisation started !")
-                            # print(f"Optimisation of : {override}")
-                            run_hourly_optimisation(
-                                override=CONFIG["operational"],
-                                optim_mode="operational",
-                                static_overrides=static_override_dict,
-                                is_nested=is_nested,
-                                pool=global_pool,
-                            )
-                        else:
-                            logger.info("Design optimisation is not performed yet!")
-                    except KeyboardInterrupt:
-                        logger.warning(
-                            "\nParent process received interrupt. Terminating workers..."
-                        )
-                        global_pool.terminate()  # Instantly kill all workers
-                        global_pool.join()
-                        logger.info("Pool terminated successfully.")
-                        raise  # Re-raise to stop the entire script
-                    finally:
-                        global_pool.close()
-                        global_pool.join()
-                        logger.info(f"Closed {n_cores} workers pool!")
-
-                    logger.info("Completed optimisation")
-
-                elif opt_type == "rl_optim":
-                    logger.info("Design optimisation started !")
-                    num_envs = min(4, cpu_count())
-                    logger.info(
-                        f"Launching {num_envs} persistent RL worker environments..."
+                    logger.info("Operational optimisation started !")
+                    # print(f"Optimisation of : {override}")
+                    run_hourly_optimisation(
+                        override=CONFIG["operational"],
+                        optim_mode="operational",
+                        static_overrides=static_override_dict,
+                        is_nested=is_nested,
                     )
-                    try:
-                        # Initialize env once with hour 1
-                        override = CONFIG["design"]
-                        rl_env = SubprocVecEnv(
-                            [
-                                make_env(
-                                    override["overrides"],
-                                    override["types"],
-                                    override["lb"],
-                                    override["ub"],
-                                    {},
-                                    1,
-                                    CONFIG["rl_max_steps"],
-                                    optim_mode="operational",
-                                )
-                                for _ in range(num_envs)
-                            ]
-                        )
-                        # print(f"Optimisation of : {override}")
-                        optimals = call_optimiser(
-                            override=override,
-                            optim_mode="design",
-                            target_hour=1,
-                            is_nested=is_nested,
-                            pool=rl_env,
-                        )
-
-                        if optimals[0] is not None:
-                            # Force every value to be a native Python float
-                            static_override_dict = {
-                                name: float(val)
-                                for name, val in zip(
-                                    CONFIG["design"]["overrides"], optimals[0]
-                                )
-                            }
-                            # Initialize env once with hour 1
-                            override = CONFIG["operational"]
-                            rl_env = SubprocVecEnv(
-                                [
-                                    make_env(
-                                        override["overrides"],
-                                        override["types"],
-                                        override["lb"],
-                                        override["ub"],
-                                        static_override_dict,
-                                        1,
-                                        CONFIG["rl_max_steps"],
-                                        optim_mode="operational",
-                                    )
-                                    for _ in range(num_envs)
-                                ]
-                            )
-
-                            logger.info("Operational optimisation started !")
-                            # print(f"Optimisation of : {override}")
-                            run_hourly_optimisation(
-                                override=override,
-                                optim_mode="operational",
-                                static_overrides=static_override_dict,
-                                is_nested=is_nested,
-                                pool=rl_env,
-                            )
-                        else:
-                            logger.info("Design optimisation is not performed yet!")
-                    except KeyboardInterrupt:
-                        logger.warning("User interrupted the process.")
-
-                    finally:
-                        # catch-all cleanup
-                        if rl_env is not None:
-                            logger.info("Terminating RL environments...")
-                            rl_env.close()
-                            logger.info("RL environments closed.")
                 else:
-                    logger.info(f"{opt_type} is not a valid optimiser!")
-
+                    logger.info("Design optimisation is not performed yet!")
+                logger.info("Completed optimisation")
         else:
             logger.info(f"{CONFIG['route']} : Not a valid route!")

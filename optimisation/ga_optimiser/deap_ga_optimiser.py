@@ -130,7 +130,6 @@ def run_deap_ga_optimisation(
     static_overrides: dict[str, float],
     is_nested: bool,
     curr_hour: int,
-    pool,
 ):
     try:
         timestamp = CONFIG["session_time"]
@@ -237,7 +236,7 @@ def run_deap_ga_optimisation(
 
             toolbox.register("mutate", custom_mutation)
             # pool mapping
-            toolbox.register("map", pool.map)
+            # toolbox.register("map", pool.map)
 
             # ------- Stable checkpoint key ------------------
             ckpt_key = hashlib.sha256(
