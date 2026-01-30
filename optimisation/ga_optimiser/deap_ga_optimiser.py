@@ -10,6 +10,7 @@ import pickle
 import tabulate as tb
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
 from deap import base, creator, tools, algorithms
 
@@ -380,6 +381,7 @@ def run_deap_ga_optimisation(
                     ax.set_title("Fitness vs Generation")
                     ax.set_xlabel("Generation")
                     ax.set_ylabel("Fitness")
+                    ax.xaxis.set_major_locator(MultipleLocator(1))
                     ax.legend()
                     ax.grid(True, linestyle=":", alpha=0.5)
 
