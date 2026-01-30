@@ -9,25 +9,18 @@ from pathlib import Path
 import pickle
 import tabulate as tb
 import matplotlib
+import matplotlib.pyplot as plt
 
 from deap import base, creator, tools, algorithms
 
-from utilities.graph_plotter import live_plot_process
 from config import CONFIG
 from simulation import run_simulation
 from objective_functions import objective_function
-from multiprocessing import Process, Queue
-from queue import Full
 
 
 logger = logging.getLogger("NYS_Optimisation")
 
-# Try Qt5Agg first, it's the most robust for Linux
-try:
-    matplotlib.use("Qt5Agg")
-except:
-    # Fallback to TkAgg if Qt5 isn't installed
-    matplotlib.use("TkAgg")
+matplotlib.use("Agg")  # headless, SSH-safe
 
 
 # ----------------------------
@@ -186,22 +179,6 @@ def run_deap_ga_optimisation(
             logger.info(f"Variables: {var_names}")
             logger.info(f"Types: {var_types}")
             logger.info(f"Bounds: {list(zip(lb, ub))}")
-
-            plot_queue = Queue()
-
-            if optim_mode == "design":
-                plot_file = Path(
-                    f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
-                )
-            else:
-                plot_file = Path(
-                    f"plots/GA_plots/GA_operational_fitness_vs_gen_{timestamp}.png"
-                )
-
-            plot_process = Process(
-                target=live_plot_process, args=(plot_queue, plot_file), daemon=True
-            )
-            plot_process.start()
 
             # DEAP setup
             if not hasattr(creator, "FitnessMax"):
@@ -364,6 +341,19 @@ def run_deap_ga_optimisation(
                 evaluate_population(toolbox, pop)
                 hof.update(pop)
 
+            gens_log = []
+            max_fitness_log = []
+            avg_fitness_log = []
+
+            if optim_mode == "design":
+                plot_path = Path(
+                    f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
+                )
+            else:
+                plot_path = Path(
+                    f"plots/GA_plots/GA_operational_fitness_vs_gen_{timestamp}.png"
+                )
+            plot_path.parent.mkdir(parents=True, exist_ok=True)
             # ----------- GA loop ------------------------------------
             for gen in range(start_gen, num_generations):
                 offspring = algorithms.varAnd(pop, toolbox, cxpb, mutpb)
@@ -375,10 +365,26 @@ def run_deap_ga_optimisation(
                 record = stats.compile(pop)
                 logbook.record(gen=gen, nevals=nevals, **record)
 
-                try:
-                    plot_queue.put_nowait((gen, record["max"], record["avg"]))
-                except Exception:
-                    pass
+                gens_log.append(gen)
+                max_fitness_log.append(record["max"])
+                avg_fitness_log.append(record["avg"])
+
+                if gen % 1 == 0 or gen == num_generations - 1:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+
+                    ax.plot(gens_log, max_fitness_log, "r-", label="Max Fitness", lw=2)
+                    ax.plot(
+                        gens_log, avg_fitness_log, "b--", label="Avg Fitness", alpha=0.7
+                    )
+
+                    ax.set_title("Fitness vs Generation")
+                    ax.set_xlabel("Generation")
+                    ax.set_ylabel("Fitness")
+                    ax.legend()
+                    ax.grid(True, linestyle=":", alpha=0.5)
+
+                    fig.savefig(plot_path, dpi=120, bbox_inches="tight")
+                    plt.close(fig)
 
                 mlflow.log_metrics(
                     {"gen_avg": record["avg"], "gen_max": record["max"]},
@@ -432,27 +438,9 @@ def run_deap_ga_optimisation(
                 #         mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
 
             # save as a static image at the end
-            # if optim_mode == "design":
-            #     file_name = Path(
-            #         f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
-            #     )
-            # else:
-            #     file_name = Path(
-            #         f"plots/GA_plots/GA_operational_fitness_vs_gen_{timestamp}.png"
-            #     )
-            # file_name.parent.mkdir(parents=True, exist_ok=True)
             # fig.savefig(fname=file_name)
             # plt.show() # blocks execution of code
 
-            try:
-                plot_queue.put("STOP")
-            except Exception:
-                pass
-
-            plot_process.join(timeout=1)
-
-            if plot_process.is_alive():
-                plot_process.terminate()
             # ------ Final result ---------------------------------
             best_ind = hof[0]
             best_solution = [
