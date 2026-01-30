@@ -15,11 +15,21 @@ from matplotlib.ticker import MultipleLocator
 
 from deap import base, creator, tools, algorithms
 
-from utilities.checkpointing import atomic_pickle_dump
-from utilities.graph_plotter import create_live_plot
+from utilities.graph_plotter import live_plot_process
 from config import CONFIG
 from simulation import run_simulation
 from objective_functions import objective_function
+
+from multiprocessing import Process, Queue
+
+plot_queue = Queue()
+
+plot_process = Process(
+    target=live_plot_process,
+    args=(plot_queue,),
+    daemon=True
+)
+plot_process.start()
 
 logger = logging.getLogger("NYS_Optimisation")
 
@@ -129,6 +139,23 @@ def init_fresh_ga(toolbox, pop_size):
 
     start_gen = 0
     return pop, logbook, hof, start_gen
+
+# serialise population object to be pickle-safe
+def serialize_population(pop):
+    return [
+        (list(ind), ind.fitness.values)
+        for ind in pop
+    ]
+
+# de-serialise population object from pickle one
+def deserialize_population(serialized, toolbox):
+    pop = []
+    for genome, fitness in serialized:
+        ind = toolbox.individual()
+        ind[:] = genome
+        ind.fitness.values = fitness
+        pop.append(ind)
+    return pop
 
 
 # -------- MAIN GA TASK ----------------------
@@ -249,41 +276,39 @@ def run_deap_ga_optimisation(
 
             # ------- Stable checkpoint key ------------------
             ckpt_key = hashlib.sha256(
-                json.dumps(
-                    {
-                        "vars": var_names,
-                        "lb": lb,
-                        "ub": ub,
-                        "pop": pop_size,
-                        "gens": num_generations,
-                    },
-                    sort_keys=True,
-                ).encode()
+                json.dumps({
+                    "optim_mode": optim_mode,
+                    "vars": var_names,
+                    "types": [t.__name__ for t in var_types],
+                    "lb": lb,
+                    "ub": ub,
+                    "pop": pop_size,
+                    "gens": num_generations,
+                    "cxpb": cxpb,
+                    "mutpb": mutpb,
+                    "indpb": indpb,
+                    "static_overrides": static_overrides,
+                }, sort_keys=True).encode()
             ).hexdigest()[:12]
 
             def safe_pickle_save(data, file_path):
-                """Directly saves pickle with a retry mechanism for Windows locking."""
-                for attempt in range(3):
-                    try:
-                        with open(file_path, "wb") as f:
-                            pickle.dump(data, f)
-                        return True  # Success
-                    except (PermissionError, FileNotFoundError) as e:
-                        if attempt < 2:
-                            time.sleep(0.2)  # Wait for OS lock to release
-                            continue
-                        logger.warning(f"Final Save Attempt Failed: {e}")
-                return False
+                tmp_path = file_path.with_suffix(".tmp")
+                try:
+                    with open(tmp_path, "wb") as f:
+                        pickle.dump(data, f)
+                    tmp_path.replace(file_path)  # atomic on same filesystem
+                    return True
+                except Exception as e:
+                    logger.warning(f"Checkpoint save failed: {e}")
+                    return False
 
             # checkpoint_dir = (
             #     Path(__file__).resolve().parents[1] / "checkpoints" / ckpt_key
             # )
 
             # BASE_DIR = Path(__file__).resolve().parents[1] # Directory of the current script
-            if optim_mode == "design":
-                checkpoint_dir = Path(f"checkpoints/GA/GA_design/{ckpt_key}")
-            else:
-                checkpoint_dir = Path(f"checkpoints/GA/GA_operational/{ckpt_key}")
+            sub_path = "GA_design" if optim_mode == "design" else "GA_operational"
+            checkpoint_dir = Path(f"checkpoints/GA/{sub_path}/{ckpt_key}")
 
             resume_file = Path(f"{checkpoint_dir}/checkpoint_latest.pkl")
             resume_file.parent.mkdir(parents=True, exist_ok=True)
@@ -304,12 +329,14 @@ def run_deap_ga_optimisation(
                         logger.info(
                             f"Resuming from {resume_file} at generation {cp['generation']}"
                         )
-                        pop = cp["pop"]
-                        logbook = cp["logbook"]
-                        hof = cp["hof"]
-                        start_gen = cp["generation"] + 1
+                        # init random seed first
                         random.setstate(cp["rndstate"])
                         np.random.set_state(cp["np_rndstate"])
+                        pop =  deserialize_population(cp["population"], toolbox)
+                        logbook = cp["logbook"]
+                        hof = tools.HallOfFame(maxsize=CONFIG.get("hall_of_fame_size"))
+                        hof[:] = deserialize_population(cp["hof"], toolbox)
+                        start_gen = cp["generation"] + 1
                 except Exception as e:
                     logger.error(f"Checkpoint corrupted: {e}. Starting fresh.")
                     pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
@@ -424,9 +451,9 @@ def run_deap_ga_optimisation(
                     "var_types": var_types,
                     "lb": lb,
                     "ub": ub,
-                    "pop": pop,
+                    "pop": serialize_population(pop),
                     "logbook": logbook,
-                    "hof": hof,
+                    "hof": serialize_population(hof),
                     "ckpt_key": ckpt_key,
                     "generation": gen,
                     "rndstate": random.getstate(),
@@ -438,7 +465,7 @@ def run_deap_ga_optimisation(
                     safe_pickle_save(cp_data, resume_file)
 
                     # Periodic history checkpoint
-                    if gen % CONFIG.get("checkpoint_interval", 5) == 0:
+                    if gen % CONFIG.get("checkpoint_interval") == 0:
                         gen_file = Path(f"{checkpoint_dir}/checkpoint_gen_{gen}.pkl")
                         gen_file.parent.mkdir(parents=True, exist_ok=True)
                         safe_pickle_save(cp_data, gen_file)

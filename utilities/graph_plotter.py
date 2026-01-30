@@ -1,33 +1,32 @@
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
 
-def create_live_plot(x_values, y_values, title="Live Plot"):
-    fig, ax = plt.subplots()
-    (line,) = ax.plot([], [], lw=2)
+def live_plot_process(queue):
 
-    # Setting static labels
-    ax.set_title(title)
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    max_line, = ax.plot([], [], 'r-', label='Max')
+    avg_line, = ax.plot([], [], 'b--', label='Avg')
+    ax.legend()
 
-    # The update function now accepts 'x_source' and 'y_source' as extra args
-    def update(frame, x_source, y_source):
-        # We slice the explicit lists up to the current frame
-        line.set_data(x_source[:frame], y_source[:frame])
+    gens, max_f, avg_f = [], [], []
 
+    while True:
+        data = queue.get()
+        if data == "STOP":
+            break
+
+        gen, max_val, avg_val = data
+        gens.append(gen)
+        max_f.append(max_val)
+        avg_f.append(avg_val)
+
+        max_line.set_data(gens, max_f)
+        avg_line.set_data(gens, avg_f)
         ax.relim()
         ax.autoscale_view()
-        return (line,)
 
-    # We use fargs to pass our explicit x and y lists into the update function
-    ani = FuncAnimation(
-        fig,
-        update,
-        frames=len(x_values),
-        fargs=(x_values, y_values),  # This 'feeds' the data to update
-        blit=False,
-        interval=50,
-        repeat=False,
-    )
+        plt.pause(0.001)
 
+    plt.ioff()
     plt.show()
-    return ani
