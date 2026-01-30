@@ -1,6 +1,7 @@
 import httpx
 from router import run_router
 from utilities.setup_custom_logger import setup_custom_logger
+from multiprocessing import freeze_support
 
 
 # def load_repro_config(path):
@@ -64,6 +65,7 @@ if __name__ == "__main__":
 
     try:
         # proceed with normal run using modified CONFIG
+        freeze_support()
         main()
     except KeyboardInterrupt:
         print("\nProcess interrupted by User! Shutting down workers...")
