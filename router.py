@@ -13,6 +13,8 @@ import logging
 from optimisation.rl_optimiser.ppo_rl_training import make_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
+from utilities.hour_sampling import build_operating_hours_from_month_day
+
 logger = logging.getLogger("NYS_Optimisation")
 
 
@@ -38,6 +40,7 @@ def call_optimiser(
     is_nested: bool,
     target_hour: int,
     pool,
+    rec=None,
     static_overrides: Optional[dict[str, float]] = None,
 ):
     # FIXME : try and catch is not working as expected,
@@ -73,6 +76,7 @@ def call_optimiser(
                 is_nested=is_nested,
                 curr_hour=target_hour,
                 pool=pool,
+                rec=rec,
             )
         elif opt_type == "rl_optim":
             x_opt, f_val, o_metrices = train_rl(
@@ -82,6 +86,7 @@ def call_optimiser(
                 is_nested=is_nested,
                 hour_index=target_hour,
                 env=pool,
+                rec=rec,
             )
         else:
             print(f"{opt_type} : Not a valid optimiser name in CONFIG")
@@ -115,9 +120,21 @@ def run_hourly_optimisation(
     static_overrides: Optional[dict[str, float]] = None,
 ):
     results = {}
+    operating_records = build_operating_hours_from_month_day(
+        CONFIG["USER_DEFINED_DAYS"]
+    )
     try:
-        for hour in range(1, 8761):
-            print(f"\n{'-' * 40}\nOptimising for hour {hour}\n{'-' * 40}")
+        for rec in operating_records:
+            hour = rec["sam_hour"]
+
+            logger.info(
+                f"\n{'-' * 30}\n"
+                f"Season : {rec['season']}\n"
+                f"Date   : {rec['day']:02d}-{rec['month']:02d}-2020\n"
+                f"Hour   : {rec['hour_of_day']:02d}:00–{rec['hour_of_day'] + 1:02d}:00\n"
+                f"SAM hr : {hour}\n"
+                f"{'-' * 30}"
+            )
 
             best_x, best_f, _ = call_optimiser(
                 override=override,
@@ -126,6 +143,7 @@ def run_hourly_optimisation(
                 is_nested=is_nested,
                 target_hour=hour,
                 pool=pool,
+                rec=rec,
             )
 
             results[hour] = {"best_solution": best_x, "best_fitness": best_f}
@@ -222,6 +240,7 @@ def run_router():
                                 1,
                                 CONFIG["rl_max_steps"],
                                 optim_mode=route,
+                                seed=CONFIG.get["random_seed"],
                             )
                             for _ in range(num_envs)
                         ]
@@ -298,6 +317,7 @@ def run_router():
                                     1,
                                     CONFIG["rl_max_steps"],
                                     optim_mode="operational",
+                                    seed=CONFIG.get["random_seed"],
                                 )
                                 for _ in range(num_envs)
                             ]
@@ -403,6 +423,7 @@ def run_router():
                                     1,
                                     CONFIG["rl_max_steps"],
                                     optim_mode="operational",
+                                    seed=CONFIG.get["random_seed"],
                                 )
                                 for _ in range(num_envs)
                             ]

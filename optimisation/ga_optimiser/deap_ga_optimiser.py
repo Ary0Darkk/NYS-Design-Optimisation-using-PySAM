@@ -148,6 +148,7 @@ def run_deap_ga_optimisation(
     is_nested: bool,
     curr_hour: int,
     pool,
+    rec,
 ):
     try:
         timestamp = CONFIG["session_time"]
@@ -163,6 +164,16 @@ def run_deap_ga_optimisation(
             mlflow.set_tag("Author", CONFIG["author"])
             mlflow.log_artifact("config.py")
             mlflow.set_tag("hour", curr_hour)
+            if optim_mode == "operational":
+                mlflow.log_param("year", 2020)
+                mlflow.log_param("operating_start_hour", 7)
+                mlflow.log_param("operating_end_hour", 16)
+                mlflow.set_tag(f"hour_{curr_hour}_season", rec["season"])
+                mlflow.set_tag(
+                    f"hour_{curr_hour}_date",
+                    f"{rec['day']:02d}-{rec['month']:02d}-2020",
+                )
+                mlflow.set_tag(f"hour_{curr_hour}_hod", rec["hour_of_day"])
 
             # ----------------------------
             # Read configuration
@@ -392,6 +403,22 @@ def run_deap_ga_optimisation(
                     {"gen_avg": record["avg"], "gen_max": record["max"]},
                     step=gen,
                 )
+                best_ind = hof[0]
+                mlflow.log_metrics(
+                    {
+                        name: v_type(
+                            max(l, min(u, round(val) if v_type is int else val))
+                        )
+                        for name, v_type, l, u, val in zip(
+                            var_names, var_types, lb, ub, best_ind
+                        )
+                    },
+                    step=gen,
+                )
+                mlflow.log_metrics(
+                    {"best fitness": float(best_ind.fitness.values[0])},
+                    step=gen,
+                )
 
                 cp_data = {
                     "var_name": var_names,
@@ -460,7 +487,6 @@ def run_deap_ga_optimisation(
 
             best_fitness = float(best_ind.fitness.values[0])
 
-            mlflow.log_metrics({"Best fitness": best_fitness})
             mlflow.log_params(
                 {
                     "pop_size": pop_size,
@@ -508,6 +534,7 @@ def run_deap_ga_optimisation(
                     f"{res_table}"
                 )
 
+            # mlflow.log_metrics(res_dict)
             result_logbook = pd.DataFrame([res_dict])
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"

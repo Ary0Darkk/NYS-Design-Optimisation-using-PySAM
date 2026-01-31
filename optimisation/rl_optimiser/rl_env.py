@@ -5,6 +5,7 @@ import logging
 
 from simulation import run_simulation
 from objective_functions import objective_function
+from config import CONFIG
 
 logger = logging.getLogger("NYS_Optimisation")
 
@@ -27,6 +28,7 @@ class SolarMixedOptimisationEnv(gym.Env):
         hour_index,
         max_steps,
         optim_mode,
+        seed,
     ):
         super().__init__()
 
@@ -37,11 +39,10 @@ class SolarMixedOptimisationEnv(gym.Env):
         self.static_overrides = static_overrides
         self.hour_index = hour_index
         self.optim_mode = optim_mode
+        self.seed = seed
 
         self.action_space = spaces.Box(
-            low=self.lb,
-            high=self.ub,
-            dtype=np.float32,
+            low=self.lb, high=self.ub, dtype=np.float32, seed=self.seed
         )
 
         self.observation_space = self.action_space
@@ -72,7 +73,6 @@ class SolarMixedOptimisationEnv(gym.Env):
         self.state = self.np_random.uniform(low=self.lb, high=self.ub).astype(
             np.float32
         )  # initialise from some random value for exploration
-        # self.state = np.zeros_like(self.action_space.low)
         return self.state, {}
 
     def step(self, action):
@@ -83,9 +83,10 @@ class SolarMixedOptimisationEnv(gym.Env):
         for i, name in enumerate(self.var_names):
             val = action[i]
 
-            overrides_dyn[name] = float(
-                val
-            )  # type casting self.var_types[i] -> int or float then (val) type cast val into that type
+            if self.var_types[i] == "int":
+                overrides_dyn[name] = int(np.round(val))
+            else:
+                overrides_dyn[name] = float(val)
 
         self.last_overrides = overrides_dyn
         self.static_overrides = {
@@ -96,15 +97,15 @@ class SolarMixedOptimisationEnv(gym.Env):
 
         # ---- Run simulation ----
 
-        sim_result = run_simulation(final_overrides)
-        # table = tb.tabulate(
-        #     [final_overrides.values()], headers=final_overrides.keys(), tablefmt="psql"
-        # )
-        # logger.info(f"Ran sim with paramters :\n{table}")
+        sim_result, penality_flag = run_simulation(final_overrides)
 
+        obj = None
         if self.optim_mode == "design":
             try:
-                obj = sim_result["annual_energy"]
+                if penality_flag:
+                    obj = sim_result["annual_energy"]
+                else:
+                    obj = CONFIG["penalty"]
             except KeyError:
                 # This will print the ACTUAL keys being returned by the cached task
                 print(
@@ -112,18 +113,22 @@ class SolarMixedOptimisationEnv(gym.Env):
                 )
                 obj = 0  # Return a penalty score instead of crashing
         elif self.optim_mode == "operational":
-            obj = objective_function(
-                sim_result["hourly_energy"],
-                sim_result["pc_htf_pump_power"],
-                sim_result["field_htf_pump_power"],
-                sim_result["field_collector_tracking_power"],
-                sim_result["pc_startup_thermal_power"],
-                sim_result["field_piping_thermal_loss"],
-                sim_result["receiver_thermal_loss"],
-                hour_index=self.hour_index,
-            )
+            if penality_flag is not True:
+                obj = objective_function(
+                    sim_result["hourly_energy"],
+                    sim_result["pc_htf_pump_power"],
+                    sim_result["field_htf_pump_power"],
+                    sim_result["field_collector_tracking_power"],
+                    sim_result["pc_startup_thermal_power"],
+                    sim_result["field_piping_thermal_loss"],
+                    sim_result["receiver_thermal_loss"],
+                    hour_index=self.hour_index,
+                )
+            else:
+                obj = CONFIG["penalty"]
         else:
             print(f"{self.optim_mode} is invalid!")
+            raise ValueError(f"Invalid optim_mode: {self.optim_mode}")
 
         reward = np.float32(obj)
 
@@ -147,5 +152,10 @@ class SolarMixedOptimisationEnv(gym.Env):
         # ---- max steps limit ----
         terminated = False
         truncated = self.current_step >= self.max_steps
+        info_dict = {
+            "overrides": overrides_dyn,
+            "penalty": penality_flag,
+            "raw_objective": obj,
+        }
 
-        return self.state, reward, terminated, truncated, {"overrides": overrides_dyn}
+        return self.state, reward, terminated, truncated, info_dict

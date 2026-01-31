@@ -14,6 +14,8 @@ import logging
 
 logger = logging.getLogger("NYS_Optimisation")
 
+timestamp = CONFIG["session_time"]
+
 
 # creates envs
 def make_env(
@@ -25,6 +27,7 @@ def make_env(
     hour_index,
     max_steps,
     optim_mode,
+    seed,
 ):
     def _init():
         return SolarMixedOptimisationEnv(
@@ -36,6 +39,7 @@ def make_env(
             hour_index=hour_index,
             max_steps=max_steps,
             optim_mode=optim_mode,
+            seed=seed,
         )
 
     return _init
@@ -53,10 +57,11 @@ def train_rl(
     env=None,
 ):
     try:
-        if optim_mode == "design":
-            run_name = "RL_Design_optimisation"
-        else:
-            run_name = f"RL_hour_{hour_index}"
+        run_name = (
+            "RL_Design_optimisation"
+            if optim_mode == "design"
+            else f"RL_hour_{hour_index}"
+        )
 
         if mlflow.active_run() and not is_nested:
             mlflow.end_run()
@@ -71,29 +76,17 @@ def train_rl(
             var_types = override["types"]
             lb, ub = override["lb"], override["ub"]
 
-            # num_envs = min(4, multiprocessing.cpu_count())  # use physical cores
-
-            # env = SubprocVecEnv(
-            #     [
-            #         make_env(
-            #             var_names,
-            #             var_types,
-            #             lb,
-            #             ub,
-            #             static_overrides,
-            #             hour_index,
-            #             CONFIG["rl_max_steps"],
-            #             optim_mode,
-            #         )
-            #         for _ in range(num_envs)
-            #     ]
-            # )
-
             # ---- Checkpoint directory ----
-            ckpt_dir = Path("checkpoints") / "rl" / f"hour_{hour_index}"
-            ckpt_dir.mkdir(parents=True, exist_ok=True)
+            sub_path = "RL_design" if optim_mode == "design" else "RL_operational"
+            checkpoint_dir = Path(f"checkpoints/RL/{sub_path}/checkpoint_{timestamp}")
 
-            model_path = ckpt_dir / "ppo_latest.zip"
+            model_path = Path(f"{checkpoint_dir}/ppo_latest.zip")
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # ckpt_dir = Path("checkpoints") / "rl" / f"hour_{hour_index}"
+            # ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+            # model_path = ckpt_dir / "ppo_latest.zip"
 
             # ---- Handle Hyperparameters ----
             # We prioritize Optuna, then fallback to CONFIG, then fallback to SB3 defaults
@@ -110,22 +103,22 @@ def train_rl(
                 model = PPO(
                     "MlpPolicy",
                     env,
-                    learning_rate=get_val("learning_rate", 3e-4),
-                    n_steps=get_val("n_steps", 20),
-                    batch_size=get_val("batch_size", 10),
-                    ent_coef=get_val("ent_coef", 0.01),
-                    gamma=get_val("gamma", 0.99),
-                    n_epochs=10,
+                    learning_rate=CONFIG.get("rl_lr"),
+                    n_steps=CONFIG.get("rl_max_steps"),
+                    batch_size=CONFIG.get("rl_batch_size"),
+                    ent_coef=CONFIG.get("rl_ent_coef"),
+                    gamma=CONFIG.get("rl_gamma"),
+                    n_epochs=CONFIG.get("rl_epochs"),
                     gae_lambda=0.95,
                     clip_range=0.2,
                     device="cpu",  # available
                     verbose=0,
-                    seed=CONFIG.get("random_seed", 21),
+                    seed=CONFIG.get("random_seed"),
                 )
 
             checkpoint_cb = CheckpointCallback(
-                save_freq=CONFIG.get("rl_checkpoint_freq", 10),
-                save_path=str(ckpt_dir),
+                save_freq=CONFIG.get("rl_checkpoint_freq"),
+                save_path=str(checkpoint_dir),
                 name_prefix="ppo",
             )
 
@@ -146,7 +139,7 @@ def train_rl(
                 tuning_cb = TrialEvalCallback(eval_env, trial, eval_freq=20)
                 callbacks.append(tuning_cb)
 
-            total_timesteps = CONFIG.get("rl_timesteps", 2)
+            total_timesteps = CONFIG.get("rl_timesteps")
 
             logger.info(f"PPO device: {model.policy.device}")
             model.learn(
@@ -161,7 +154,8 @@ def train_rl(
 
             for _ in range(CONFIG.get("rl_eval_steps")):
                 action, _ = model.predict(obs, deterministic=True)
-                obs, rewards, dones, infos = env.step(action)
+                obs, rewards, terminated, truncated, infos = env.step(action)
+                dones = terminated or truncated
 
                 max_idx = rewards.argmax()
 
@@ -204,11 +198,11 @@ def train_rl(
                     f"{res_table}"
                 )
 
+            mlflow.log_metrics(res_dict)
             result_logbook = pd.DataFrame([res_dict])
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"
 
-            timestamp = CONFIG["session_time"]
             if optim_mode == "design":
                 file_name = Path(f"results/RL_results/RL_design_{timestamp}.csv")
             else:

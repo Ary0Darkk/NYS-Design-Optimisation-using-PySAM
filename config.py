@@ -25,6 +25,12 @@ CONFIG = {
     # "storage_block": "local-file-system/local-storage",
     "num_cores": 4,
     "penalty": -1e13,
+    "USER_DEFINED_DAYS": {
+        "winter": [(1, 5), (1, 18), (2, 3), (2, 20), (12, 5), (12, 18), (12, 28)],
+        "summer": [(3, 10), (3, 25), (4, 8), (4, 22), (5, 5), (5, 18), (5, 30)],
+        "monsoon": [(6, 10), (6, 25), (7, 8), (7, 22), (8, 5), (8, 18), (8, 30)],
+        "post": [(9, 10), (9, 25), (10, 8), (10, 22), (11, 5), (11, 18), (11, 30)],
+    },
     # ------ overrides --------------------------------------
     "design": {
         "overrides": [
@@ -62,7 +68,7 @@ CONFIG = {
     "tournament_size": 7,
     "pop_size": 10,  # polulation size
     "hall_of_fame_size": 5,  # elites we preserve from each gen
-    "num_generations": 4,
+    "num_generations": 2,
     "cxpb": 0.8,  # prob of mating an ind
     "mutpb": 0.6,  # prob of mutating an ind
     "indpb": 0.4,  # decides how much a chosen individual changes,generally 1/num of variables
@@ -70,9 +76,14 @@ CONFIG = {
     # ------rl-based optimisation settings-------------------
     "rl_max_steps": 3,
     "rl_eval_steps": 2,
+    "rl_timesteps": 10,
+    "rl_epochs": 10,
+    "rl_gamma": 0.99,
     "rl_lr": 3e-1,
     "rl_checkpoint_freq": 10,
     "rl_timesteps": 10,
+    "rl_batch_size": 10,
+    "rl_ent_coef": 0,
     # ------- other optimiser (not available) ------------------------------------------------
     # nlopt-fmincon settings
     # "nlopt_algorithm": "LD_SLSQP",
