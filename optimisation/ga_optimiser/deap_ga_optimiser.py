@@ -363,7 +363,7 @@ def run_deap_ga_optimisation(
                 )
             else:
                 plot_path = Path(
-                    f"plots/GA_plots/GA_operational_fitness_vs_gen_{timestamp}.png"
+                    f"plots/GA_plots/GA_operational_{curr_hour}_fitness_vs_gen_{timestamp}.png"
                 )
             plot_path.parent.mkdir(parents=True, exist_ok=True)
             # ----------- GA loop ------------------------------------
