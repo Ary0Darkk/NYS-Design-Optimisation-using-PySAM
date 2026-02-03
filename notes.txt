@@ -146,3 +146,46 @@ I need to completely local cause network error can crash optimisation runs. I am
 Now I have to focus on one thing get optimisation running correctly.
 
 https://gemini.google.com/u/1/app/d37707c9eab37bc6?android-min-version=301356232&ios-min-version=322.0&is_sa=1&campaign_id=gemini_overview_page&utm_source=gemini&utm_medium=web&utm_campaign=gemini_overview_page&pt=9008&mt=8&ct=gemini_overview_page&hl=en-IN&pageId=none#:~:text=Recommended%20Implementation,ub%2C%20static_overrides%2C%20shared_log_file - perform this task in our code
+
+
+2026-2-3
+config fixed for now:
+
+"USER_DEFINED_DAYS": {
+        "winter": [(1, 24), (1, 8), (1, 17), (2, 22), (2, 15), (12, 17), (12, 11)],
+        "summer": [(3, 9), (3, 21), (4, 2), (4, 13), (5, 16), (5, 17), (5, 25)],
+        "monsoon": [(6, 24), (6, 23), (7, 7), (7, 15), (7, 23), (8, 8), (8, 20)],
+        "post": [(9, 2), (9, 22), (10, 5), (10, 17), (11, 15), (11, 25), (11, 27)],
+    },
+    # ------ overrides --------------------------------------
+    "design": {
+        "overrides": [
+            "specified_total_aperture",  # total aperture area
+            "Row_Distance",  # row spacing
+            "ColperSCA",  # num of modules per SCA
+            "W_aperture",  # width of SCA
+            "L_SCA",  # length of collector assembly
+        ],
+        # Bounds
+        "lb": [7000, 5, 2, 1, 50],
+        "ub": [9000, 25, 10, 15, 200],
+        "types": [
+            int,
+            int,
+            int,
+            int,
+            int,
+        ],
+    },
+    "operational": {
+        "overrides": [
+            "m_dot",  # mass-flow rate
+            "T_startup",  # startup temp
+            "T_shutdown",  # shutdown temp
+        ],
+        # Bounds
+        "lb": [2, 275, 275],
+        "ub": [12, 375, 350],
+        "types": [int, int, int],
+    },
+
