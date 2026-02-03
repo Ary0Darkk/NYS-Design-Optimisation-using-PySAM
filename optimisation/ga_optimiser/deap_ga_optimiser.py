@@ -8,19 +8,20 @@ import logging
 from pathlib import Path
 import pickle
 import tabulate as tb
-import time
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
 from deap import base, creator, tools, algorithms
 
-from utilities.checkpointing import atomic_pickle_dump
-from utilities.graph_plotter import create_live_plot
 from config import CONFIG
 from simulation import run_simulation
 from objective_functions import objective_function
 
+
 logger = logging.getLogger("NYS_Optimisation")
+
+matplotlib.use("Agg")  # headless, SSH-safe
 
 
 # ----------------------------
@@ -123,6 +124,22 @@ def init_fresh_ga(toolbox, pop_size):
     return pop, logbook, hof, start_gen
 
 
+# serialise population object to be pickle-safe
+def serialize_population(pop):
+    return [(list(ind), ind.fitness.values) for ind in pop]
+
+
+# de-serialise population object from pickle one
+def deserialize_population(serialized, toolbox):
+    pop = []
+    for genome, fitness in serialized:
+        ind = toolbox.individual()
+        ind[:] = genome
+        ind.fitness.values = fitness
+        pop.append(ind)
+    return pop
+
+
 # -------- MAIN GA TASK ----------------------
 def run_deap_ga_optimisation(
     override: dict,
@@ -130,6 +147,7 @@ def run_deap_ga_optimisation(
     static_overrides: dict[str, float],
     is_nested: bool,
     curr_hour: int,
+    rec,
 ):
     try:
         timestamp = CONFIG["session_time"]
@@ -145,6 +163,16 @@ def run_deap_ga_optimisation(
             mlflow.set_tag("Author", CONFIG["author"])
             mlflow.log_artifact("config.py")
             mlflow.set_tag("hour", curr_hour)
+            if optim_mode == "operational":
+                mlflow.log_param("year", 2020)
+                mlflow.log_param("operating_start_hour", 7)
+                mlflow.log_param("operating_end_hour", 16)
+                mlflow.set_tag(f"hour_{curr_hour}_season", rec["season"])
+                mlflow.set_tag(
+                    f"hour_{curr_hour}_date",
+                    f"{rec['day']:02d}-{rec['month']:02d}-2020",
+                )
+                mlflow.set_tag(f"hour_{curr_hour}_hod", rec["hour_of_day"])
 
             # ----------------------------
             # Read configuration
@@ -242,39 +270,40 @@ def run_deap_ga_optimisation(
             ckpt_key = hashlib.sha256(
                 json.dumps(
                     {
+                        "optim_mode": optim_mode,
                         "vars": var_names,
+                        "types": [t.__name__ for t in var_types],
                         "lb": lb,
                         "ub": ub,
                         "pop": pop_size,
                         "gens": num_generations,
+                        "cxpb": cxpb,
+                        "mutpb": mutpb,
+                        "indpb": indpb,
+                        "static_overrides": static_overrides,
                     },
                     sort_keys=True,
                 ).encode()
             ).hexdigest()[:12]
 
             def safe_pickle_save(data, file_path):
-                """Directly saves pickle with a retry mechanism for Windows locking."""
-                for attempt in range(3):
-                    try:
-                        with open(file_path, "wb") as f:
-                            pickle.dump(data, f)
-                        return True  # Success
-                    except (PermissionError, FileNotFoundError) as e:
-                        if attempt < 2:
-                            time.sleep(0.2)  # Wait for OS lock to release
-                            continue
-                        logger.warning(f"Final Save Attempt Failed: {e}")
-                return False
+                tmp_path = file_path.with_suffix(".tmp")
+                try:
+                    with open(tmp_path, "wb") as f:
+                        pickle.dump(data, f)
+                    tmp_path.replace(file_path)  # atomic on same filesystem
+                    return True
+                except Exception as e:
+                    logger.warning(f"Checkpoint save failed: {e}")
+                    return False
 
             # checkpoint_dir = (
             #     Path(__file__).resolve().parents[1] / "checkpoints" / ckpt_key
             # )
 
             # BASE_DIR = Path(__file__).resolve().parents[1] # Directory of the current script
-            if optim_mode == "design":
-                checkpoint_dir = Path(f"checkpoints/GA/GA_design/{ckpt_key}")
-            else:
-                checkpoint_dir = Path(f"checkpoints/GA/GA_operational/{ckpt_key}")
+            sub_path = "GA_design" if optim_mode == "design" else "GA_operational"
+            checkpoint_dir = Path(f"checkpoints/GA/{sub_path}/{ckpt_key}")
 
             resume_file = Path(f"{checkpoint_dir}/checkpoint_latest.pkl")
             resume_file.parent.mkdir(parents=True, exist_ok=True)
@@ -295,12 +324,14 @@ def run_deap_ga_optimisation(
                         logger.info(
                             f"Resuming from {resume_file} at generation {cp['generation']}"
                         )
-                        pop = cp["pop"]
-                        logbook = cp["logbook"]
-                        hof = cp["hof"]
-                        start_gen = cp["generation"] + 1
+                        # init random seed first
                         random.setstate(cp["rndstate"])
                         np.random.set_state(cp["np_rndstate"])
+                        pop = deserialize_population(cp["population"], toolbox)
+                        logbook = cp["logbook"]
+                        hof = tools.HallOfFame(maxsize=CONFIG.get("hall_of_fame_size"))
+                        hof[:] = deserialize_population(cp["hof"], toolbox)
+                        start_gen = cp["generation"] + 1
                 except Exception as e:
                     logger.error(f"Checkpoint corrupted: {e}. Starting fresh.")
                     pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
@@ -321,30 +352,19 @@ def run_deap_ga_optimisation(
                 evaluate_population(toolbox, pop)
                 hof.update(pop)
 
-            # init everything before loop execution
             gens_log = []
             max_fitness_log = []
             avg_fitness_log = []
 
-            plt.ion()  # turn on Interactive Mode
-            fig, ax = plt.subplots(figsize=(10, 6))
-
-            # Styling: Light background color
-            ax.set_facecolor("#98c6f5")  # Light grey/white background
-            fig.patch.set_facecolor("#ffffff")  # White outer border
-
-            ax.set_xlim(start_gen, num_generations)
-            # Set X-axis units to 1
-            ax.xaxis.set_major_locator(MultipleLocator(1))
-            (max_line,) = ax.plot([], [], "r-", label="Max Fitness", lw=2)
-            (avg_line,) = ax.plot([], [], "b--", label="Avg Fitness", alpha=0.6)
-
-            ax.set_title("Fitness vs Generation")
-            ax.set_xlabel("Generation")
-            ax.set_ylabel("Fitness Value")
-            ax.legend()
-            ax.grid(True, linestyle=":", alpha=0.6, color="white")
-
+            if optim_mode == "design":
+                plot_path = Path(
+                    f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
+                )
+            else:
+                plot_path = Path(
+                    f"plots/GA_plots/GA_operational_{curr_hour}_fitness_vs_gen_{timestamp}.png"
+                )
+            plot_path.parent.mkdir(parents=True, exist_ok=True)
             # ----------- GA loop ------------------------------------
             for gen in range(start_gen, num_generations):
                 offspring = algorithms.varAnd(pop, toolbox, cxpb, mutpb)
@@ -356,30 +376,46 @@ def run_deap_ga_optimisation(
                 record = stats.compile(pop)
                 logbook.record(gen=gen, nevals=nevals, **record)
 
-                # update data logs
                 gens_log.append(gen)
                 max_fitness_log.append(record["max"])
                 avg_fitness_log.append(record["avg"])
 
-                # update the existing plot
-                max_line.set_data(gens_log, max_fitness_log)
-                avg_line.set_data(gens_log, avg_fitness_log)
+                if gen % 1 == 0 or gen == num_generations - 1:
+                    fig, ax = plt.subplots(figsize=(10, 6))
 
-                # safe rescaling
-                if len(gens_log) > 1:
-                    # We only autoscale Y, because X limit is fixed by you
-                    ax.relim()
-                    ax.autoscale_view(scalex=False, scaley=True)
+                    ax.plot(gens_log, max_fitness_log, "r-", label="Max Fitness", lw=2)
+                    ax.plot(
+                        gens_log, avg_fitness_log, "b--", label="Avg Fitness", alpha=0.7
+                    )
 
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
+                    ax.set_title("Fitness vs Generation")
+                    ax.set_xlabel("Generation")
+                    ax.set_ylabel("Fitness")
+                    ax.xaxis.set_major_locator(MultipleLocator(1))
+                    ax.legend()
+                    ax.grid(True, linestyle=":", alpha=0.5)
 
-                    # INCREASE PAUSE: Since you are using multiprocessing,
-                    # the UI needs more time to process events.
-                    plt.pause(0.2)
+                    fig.savefig(plot_path, dpi=120, bbox_inches="tight")
+                    plt.close(fig)
 
                 mlflow.log_metrics(
                     {"gen_avg": record["avg"], "gen_max": record["max"]},
+                    step=gen,
+                )
+                best_ind = hof[0]
+                mlflow.log_metrics(
+                    {
+                        name: v_type(
+                            max(l, min(u, round(val) if v_type is int else val))
+                        )
+                        for name, v_type, l, u, val in zip(
+                            var_names, var_types, lb, ub, best_ind
+                        )
+                    },
+                    step=gen,
+                )
+                mlflow.log_metrics(
+                    {"best fitness": float(best_ind.fitness.values[0])},
                     step=gen,
                 )
 
@@ -388,9 +424,10 @@ def run_deap_ga_optimisation(
                     "var_types": var_types,
                     "lb": lb,
                     "ub": ub,
-                    "pop": pop,
+                    "pop": serialize_population(pop),
                     "logbook": logbook,
-                    "hof": hof,
+                    "hof": serialize_population(hof),
+                    "ckpt_key": ckpt_key,
                     "generation": gen,
                     "rndstate": random.getstate(),
                     "np_rndstate": np.random.get_state(),
@@ -401,7 +438,7 @@ def run_deap_ga_optimisation(
                     safe_pickle_save(cp_data, resume_file)
 
                     # Periodic history checkpoint
-                    if gen % CONFIG.get("checkpoint_interval", 5) == 0:
+                    if gen % CONFIG.get("checkpoint_interval") == 0:
                         gen_file = Path(f"{checkpoint_dir}/checkpoint_gen_{gen}.pkl")
                         gen_file.parent.mkdir(parents=True, exist_ok=True)
                         safe_pickle_save(cp_data, gen_file)
@@ -428,24 +465,9 @@ def run_deap_ga_optimisation(
                 #     if gen_file.exists():
                 #         mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
 
-            # after loop ends
-            plt.ioff()  # Turn off interactive mode
-
             # save as a static image at the end
-            if optim_mode == "design":
-                file_name = Path(
-                    f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
-                )
-            else:
-                file_name = Path(
-                    f"plots/GA_plots/GA_operational_fitness_vs_gen_{timestamp}.png"
-                )
-            file_name.parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(fname=file_name)
+            # fig.savefig(fname=file_name)
             # plt.show() # blocks execution of code
-
-            plt.draw()
-            plt.pause(1)
 
             # ------ Final result ---------------------------------
             best_ind = hof[0]
@@ -464,7 +486,6 @@ def run_deap_ga_optimisation(
 
             best_fitness = float(best_ind.fitness.values[0])
 
-            mlflow.log_metrics({"Best fitness": best_fitness})
             mlflow.log_params(
                 {
                     "pop_size": pop_size,
@@ -512,6 +533,7 @@ def run_deap_ga_optimisation(
                     f"{res_table}"
                 )
 
+            # mlflow.log_metrics(res_dict)
             result_logbook = pd.DataFrame([res_dict])
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"
