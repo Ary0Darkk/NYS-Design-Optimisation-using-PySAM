@@ -9,6 +9,7 @@ import mlflow
 import dagshub
 
 import logging
+from utilities.mlflow_init import initialize_mlflow
 
 logger = logging.getLogger("NYS_Optimisation")
 
@@ -126,15 +127,18 @@ def run_hourly_optimisation(
 
 def run_router():
     # database setup
-    mlflow.set_tracking_uri(
-        "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
-    )
+    # mlflow.set_tracking_uri(
+    #     "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
+    # )
     # mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    dagshub.init(
-        repo_owner="aryanvj787",
-        repo_name="NYS-Design-Optimisation-using-PySAM",
-        mlflow=True,
+    initialize_mlflow(
+        repo_owner="aryanvj787", repo_name="NYS-Design-Optimisation-using-PySAM"
     )
+    # dagshub.init(
+    #     repo_owner="aryanvj787",
+    #     repo_name="NYS-Design-Optimisation-using-PySAM",
+    #     mlflow=True,
+    # )
 
     if CONFIG.get("is_tuning", False):
         # set experiment name
