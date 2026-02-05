@@ -65,10 +65,10 @@ CONFIG = {
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
     "random_seed": 44,
-    "tournament_size": 7,
-    "pop_size": 10,  # polulation size
-    "hall_of_fame_size": 5,  # elites we preserve from each gen
-    "num_generations": 2,
+    "tournament_size": 40,
+    "pop_size": 100,  # polulation size
+    "hall_of_fame_size": 10,  # elites we preserve from each gen
+    "num_generations": 30,
     "cxpb": 0.8,  # prob of mating an ind
     "mutpb": 0.6,  # prob of mutating an ind
     "indpb": 0.4,  # decides how much a chosen individual changes,generally 1/num of variables
