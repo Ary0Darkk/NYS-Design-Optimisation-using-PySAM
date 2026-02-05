@@ -8,25 +8,21 @@
 
 cd $PBS_O_WORKDIR
 
-# Load required modules
-# module load gcc
-# module load openmpi
+# --- Secure Authentication ---
+# Read the token from the restricted file into a variable
+if [ -f "$HOME/.dagshub_token" ]; then
+    export MLFLOW_TRACKING_PASSWORD=$(cat "$HOME/.dagshub_token")
+    export MLFLOW_TRACKING_USERNAME="aryanvj787"
+    export MLFLOW_TRACKING_URI="https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
+else
+    echo "Warning: .dagshub_token file not found. MLflow might fail."
+fi
 
-# Load spack environment
+# Load spack, activate venv...
 spack load /icxqzpn
-
-# Activate virtual environment
 source .venv/bin/activate
 
-# Set environment variables for parallel processing
 export APP_CPU_COUNT=112
-# export OMP_NUM_THREADS=56
-# export MKL_NUM_THREADS=56
-# export NUMBA_NUM_THREADS=56   # tell math libraries (like NumPy or Numba) how many processors to use for "under-the-hood" calculations
 
-# MLflow configuration
-# export MLFLOW_TRACKING_URI="sqlite:///mlflow.db"
-
-# Run the optimization
-echo "Starting NYS Design Optimization using PySAM..."
+echo "Starting NYS Design Optimization..."
 uv run python3 main.py

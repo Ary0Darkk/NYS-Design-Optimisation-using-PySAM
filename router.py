@@ -7,7 +7,6 @@ from optimisation.rl_optimiser.rl_tuner import run_rl_study
 
 from config import CONFIG
 import mlflow
-import dagshub
 from multiprocessing import Pool, cpu_count
 
 import logging
@@ -162,10 +161,10 @@ def run_router():
     # mlflow.set_tracking_uri(
     #     "https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
     # )
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    # initialize_mlflow(
-    # repo_owner="aryanvj", repo_name="NYS-Design-Optimisation-using-PySAM"
-    # )
+    # mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    initialize_mlflow(
+        repo_owner="aryanvj787", repo_name="NYS-Design-Optimisation-using-PySAM"
+    )
     # dagshub.init(
     #     repo_owner="aryanvj787",
     #     repo_name="NYS-Design-Optimisation-using-PySAM",
