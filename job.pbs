@@ -1,0 +1,21 @@
+#!/bin/bash
+#PBS -N PySAM_Fast
+#PBS -q workq
+#PBS -l select=1:ncpus=112:mpiprocs=112
+#PBS -l walltime=01:00:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+# Load env
+spack load /icxqzpn 
+source .venv/bin/activate
+
+# Use the 'Aggressive' Python optimization
+# export PYTHONOPTIMIZE=1
+
+# gives count of cpus
+export APP_CPU_COUNT=112
+
+# Run the script
+uv run python3 main.py

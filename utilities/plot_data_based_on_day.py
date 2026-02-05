@@ -72,7 +72,11 @@ def plot_dni_consecutive(selections):
 
 if __name__ == "__main__":
     # Example Usage:
-    my_dates = CONFIG["USER_DEFINED_DAYS"]["post"]
-    # all_days = [day for season_days in CONFIG["USER_DEFINED_DAYS"].values() for day in season_days]
+    # my_dates = CONFIG["USER_DEFINED_DAYS"]["summer"]
+    my_dates = [
+        day
+        for season_days in CONFIG["USER_DEFINED_DAYS"].values()
+        for day in season_days
+    ]
     # print(my_dates)
     plot_dni_consecutive(my_dates)

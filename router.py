@@ -1,5 +1,6 @@
 # file to route design optimisation and operational one
 from typing import Optional
+import os
 
 from optimisation import *
 from optimisation.rl_optimiser.rl_tuner import run_rl_study
@@ -193,11 +194,26 @@ def run_router():
 
         route = optimisation_mode()
 
+        # get cpu count from configs
+        config_cpus = CONFIG.get("num_cores")
+
+        # if config is empty/None
+        if not config_cpus:
+            try:
+                # works on Linux and respects PBS/Cgroups limits
+                default_cpus = len(os.sched_getaffinity(0))
+            except AttributeError:
+                # Fallback for Windows (your laptop)
+                default_cpus = os.cpu_count()
+
+            n_cores = default_cpus
+        else:
+            n_cores = int(config_cpus)
+
         # --------- design route ------------------------------------------------
         if route == "design":
             if opt_type == "deap_ga":
                 # initialize the Pool ONCE at the start
-                n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
                 logger.info(f"Initializing persistent pool with {n_cores} cores.")
                 logger.info(f"{route} optimisation started !")
                 global_pool = Pool(processes=n_cores)
@@ -225,10 +241,7 @@ def run_router():
 
             elif opt_type == "rl_optim":
                 logger.info(f"{route} optimisation started !")
-                num_envs = min(4, cpu_count())
-                logger.info(
-                    f"Launching {num_envs} persistent RL worker environments..."
-                )
+                logger.info(f"Launching {n_cores} persistent RL worker environments...")
                 try:
                     # Initialize env once with hour 1
                     override = CONFIG[route]
@@ -245,7 +258,7 @@ def run_router():
                                 optim_mode=route,
                                 seed=CONFIG.get["random_seed"],
                             )
-                            for _ in range(num_envs)
+                            for _ in range(n_cores)
                         ]
                     )
                     # calls optimiser
@@ -277,7 +290,6 @@ def run_router():
                 logger.info(f"{route} optimisation started !")
                 if opt_type == "deap_ga":
                     # initialize the Pool ONCE at the start
-                    n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
                     logger.info(f"Initializing persistent pool with {n_cores} cores.")
                     global_pool = Pool(processes=n_cores)
                     try:
@@ -302,9 +314,8 @@ def run_router():
                         logger.info(f"Closed {n_cores} workers pool!")
 
                 elif opt_type == "rl_optim":
-                    num_envs = min(4, cpu_count())
                     logger.info(
-                        f"Launching {num_envs} persistent RL worker environments..."
+                        f"Launching {n_cores} persistent RL worker environments..."
                     )
                     try:
                         # Initialize env once with hour 1
@@ -322,7 +333,7 @@ def run_router():
                                     optim_mode="operational",
                                     seed=CONFIG.get["random_seed"],
                                 )
-                                for _ in range(num_envs)
+                                for _ in range(n_cores)
                             ]
                         )
                         # print(f"Optimisation of : {override}")
@@ -357,7 +368,6 @@ def run_router():
                 if opt_type == "deap_ga":
                     logger.info("Design optimisation started !")
                     # initialize the Pool ONCE at the start
-                    n_cores = min(cpu_count(), CONFIG.get("num_cores", cpu_count()))
                     logger.info(f"Initializing persistent pool with {n_cores} cores.")
                     global_pool = Pool(processes=n_cores)
 
@@ -408,9 +418,8 @@ def run_router():
 
                 elif opt_type == "rl_optim":
                     logger.info("Design optimisation started !")
-                    num_envs = min(4, cpu_count())
                     logger.info(
-                        f"Launching {num_envs} persistent RL worker environments..."
+                        f"Launching {n_cores} persistent RL worker environments..."
                     )
                     try:
                         # Initialize env once with hour 1
@@ -428,7 +437,7 @@ def run_router():
                                     optim_mode="operational",
                                     seed=CONFIG.get["random_seed"],
                                 )
-                                for _ in range(num_envs)
+                                for _ in range(n_cores)
                             ]
                         )
                         # print(f"Optimisation of : {override}")
@@ -462,7 +471,7 @@ def run_router():
                                         CONFIG["rl_max_steps"],
                                         optim_mode="operational",
                                     )
-                                    for _ in range(num_envs)
+                                    for _ in range(n_cores)
                                 ]
                             )
 
