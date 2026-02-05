@@ -23,7 +23,7 @@ CONFIG = {
     "resume_from_checkpoint": False,
     "refresh_cache": True,
     # "storage_block": "local-file-system/local-storage",
-    "num_cores": 4,
+    "num_cores": None,
     "penalty": -1e13,
     "USER_DEFINED_DAYS": {
         "winter": [(1, 8), (1, 13), (1, 16), (1, 28), (2, 21), (2, 22), (12, 12)],
