@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N NYS_PySAM_Optimization
-#PBS -q debug
+#PBS -q large
 #PBS -l select=1:ncpus=112:mpiprocs=112
 #PBS -j oe
 #PBS -M 23b0343@iitb.ac.in
