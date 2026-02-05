@@ -22,7 +22,9 @@ fi
 spack load /icxqzpn
 source .venv/bin/activate
 
-export APP_CPU_COUNT=112
+# Use the environment variable PBS provides to be safe
+export APP_CPU_COUNT=$PBS_NCPUS
 
-echo "Starting NYS Design Optimization..."
+# Execution 
+echo "Starting optimization on $(hostname) using $APP_CPU_COUNT CPUs..."
 uv run python3 main.py
