@@ -1,21 +1,32 @@
 #!/bin/bash
-#PBS -N PySAM_Fast
-#PBS -q workq
+#PBS -N NYS_PySAM_Optimization
+#PBS -q debug
 #PBS -l select=1:ncpus=112:mpiprocs=112
-#PBS -l walltime=01:00:00
 #PBS -j oe
+#PBS -M 23b0343@iitb.ac.in
+#PBS -m abe
 
 cd $PBS_O_WORKDIR
 
-# Load env
-spack load /icxqzpn 
+# Load required modules
+# module load gcc
+# module load openmpi
+
+# Load spack environment
+spack load /icxqzpn
+
+# Activate virtual environment
 source .venv/bin/activate
 
-# Use the 'Aggressive' Python optimization
-# export PYTHONOPTIMIZE=1
-
-# gives count of cpus
+# Set environment variables for parallel processing
 export APP_CPU_COUNT=112
+# export OMP_NUM_THREADS=56
+# export MKL_NUM_THREADS=56
+# export NUMBA_NUM_THREADS=56   # tell math libraries (like NumPy or Numba) how many processors to use for "under-the-hood" calculations
 
-# Run the script
+# MLflow configuration
+# export MLFLOW_TRACKING_URI="sqlite:///mlflow.db"
+
+# Run the optimization
+echo "Starting NYS Design Optimization using PySAM..."
 uv run python3 main.py
