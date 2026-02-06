@@ -26,6 +26,7 @@ def objective_function(
     pc_startup_thermal_power: list[float],
     field_piping_thermal_loss: list[float],
     receiver_thermal_loss: list[float],
+    f_overrides: dict,
     hour_index: int,
 ) -> float:
     """
@@ -51,38 +52,35 @@ def objective_function(
     # Shift the index to start at 1
     df.index = df.index + 1
 
+    dynamic_price_value = df["dynamic_price"][hour_index]
+
     # ---- init terms ----
     hourly_energy_value = df["hourly_energy"][hour_index]
-    hourly_energy_cost_term = (
-        hourly_energy_value * df["dynamic_price"][hour_index] * 1_000
-    )
+    hourly_energy_cost_term = hourly_energy_value * dynamic_price_value * 1_000
     field_htf_pump_power_value = df["field_htf_pump_power"][hour_index]
     field_htf_pump_power_cost_term = (
-        field_htf_pump_power_value * df["dynamic_price"][hour_index] * 1_000
+        field_htf_pump_power_value * dynamic_price_value * 1_000
     )
     pc_htf_pump_power_value = df["pc_htf_pump_power"][hour_index]
-    pc_htf_pump_power_cost_term = (
-        pc_htf_pump_power_value * df["dynamic_price"][hour_index] * 1_000
-    )
+    pc_htf_pump_power_cost_term = pc_htf_pump_power_value * dynamic_price_value * 1_000
     field_collector_tracking_power_value = df["field_collector_tracking_power"][
         hour_index
     ]
     field_collector_tracking_power_cost_term = (
-        field_collector_tracking_power_value * df["dynamic_price"][hour_index] * 1_000
+        field_collector_tracking_power_value * dynamic_price_value * 1_000
     )
     pc_startup_thermal_power_value = df["pc_startup_thermal_power"][hour_index]
     pc_startup_thermal_power_cost_term = (
-        pc_startup_thermal_power_value * df["dynamic_price"][hour_index] * 1_000 * 0.4
+        pc_startup_thermal_power_value * dynamic_price_value * 1_000 * 0.4
     )
     field_piping_thermal_loss_value = df["field_piping_thermal_loss"][hour_index]
     field_piping_thermal_loss_cost_term = (
-        field_piping_thermal_loss_value * df["dynamic_price"][hour_index] * 1_000 * 0.4
+        field_piping_thermal_loss_value * dynamic_price_value * 1_000 * 0.4
     )
     receiver_thermal_loss_value = df["receiver_thermal_loss"][hour_index]
     receiver_thermal_loss_cost_term = (
-        receiver_thermal_loss_value * df["dynamic_price"][hour_index] * 1_000 * 0.4
+        receiver_thermal_loss_value * dynamic_price_value * 1_000 * 0.4
     )
-    dynamic_price_value = df["dynamic_price"][hour_index]
 
     # ---- objective function ----
     obj = (
@@ -94,6 +92,9 @@ def objective_function(
         - field_piping_thermal_loss_cost_term
         - receiver_thermal_loss_cost_term
     )
+
+    # ----- save override variables -----
+    var_data = pd.DataFrame([f_overrides])
 
     # ---- save value of terms ----
     values_data = {}  # init dict
@@ -109,6 +110,9 @@ def objective_function(
     values_data["receiver_thermal_loss_value"] = receiver_thermal_loss_value
     values_data["hour"] = hour_index
     value_data_logbook = pd.DataFrame([values_data])
+    value_data_logbook = pd.concat(
+        [var_data.reset_index(drop=True), value_data_logbook], axis=1
+    )
 
     value_data_logbook = value_data_logbook.set_index("hour")
 
@@ -134,6 +138,7 @@ def objective_function(
     terms_data["receiver_thermal_loss_term"] = receiver_thermal_loss_cost_term
     terms_data["hour"] = hour_index
     terms_logbook = pd.DataFrame([terms_data])
+    terms_logbook = pd.concat([var_data.reset_index(drop=True), terms_logbook], axis=1)
 
     terms_logbook = terms_logbook.set_index("hour")
 

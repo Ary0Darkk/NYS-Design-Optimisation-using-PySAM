@@ -84,6 +84,7 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
                 sim_result["pc_startup_thermal_power"],
                 sim_result["field_piping_thermal_loss"],
                 sim_result["receiver_thermal_loss"],
+                f_overrides=final_overrides,
                 hour_index=hour,
             )
         else:
@@ -91,7 +92,11 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
     else:
         print(f"{optim_mode} is invalid!")
 
-    fitness = np.float32(obj)
+    # ensure don't get NaN value
+    if obj is None or not np.isfinite(obj):
+        fitness = CONFIG["penalty"]
+
+    fitness = float(obj)
     return (fitness,)
 
 
