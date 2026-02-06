@@ -163,17 +163,20 @@ def run_deap_ga_optimisation(
         with mlflow.start_run(run_name=run_name, nested=is_nested):
             mlflow.set_tag("Author", CONFIG["author"])
             mlflow.log_artifact("config.py")
-            mlflow.set_tag("hour", curr_hour)
             if optim_mode == "operational":
+                mlflow.set_tag("hour", curr_hour)
                 mlflow.log_param("year", 2020)
                 mlflow.log_param("operating_start_hour", 7)
                 mlflow.log_param("operating_end_hour", 16)
-                mlflow.set_tag(f"hour_{curr_hour}_season", rec["season"])
+                mlflow.set_tag(f"hour_season", rec["season"])
                 mlflow.set_tag(
-                    f"hour_{curr_hour}_date",
+                    f"hour_date",
                     f"{rec['day']:02d}-{rec['month']:02d}-2020",
                 )
-                mlflow.set_tag(f"hour_{curr_hour}_hod", rec["hour_of_day"])
+                mlflow.set_tag(
+                    f"hour_hod",
+                    f"{rec['hour_of_day']:02d}:00–{rec['hour_of_day'] + 1:02d}:00",
+                )
 
             # ----------------------------
             # Read configuration
