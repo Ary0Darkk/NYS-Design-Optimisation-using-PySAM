@@ -95,8 +95,9 @@ def deap_fitness(individual, hour, optim_mode, var_names, var_types, static_over
     # ensure don't get NaN value
     if obj is None or not np.isfinite(obj):
         fitness = CONFIG["penalty"]
+    else:
+        fitness = float(obj)
 
-    fitness = float(obj)
     return (fitness,)
 
 
