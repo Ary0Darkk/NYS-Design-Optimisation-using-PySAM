@@ -7,7 +7,7 @@ from optimisation.rl_optimiser.rl_tuner import run_rl_study
 
 from config import CONFIG
 import mlflow
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 
 import logging
 from optimisation.rl_optimiser.ppo_rl_training import make_env
@@ -215,7 +215,7 @@ def run_router():
                 # initialize the Pool ONCE at the start
                 logger.info(f"Initializing persistent pool with {n_cores} cores.")
                 logger.info(f"{route} optimisation started !")
-                global_pool = Pool(processes=n_cores)
+                global_pool = Pool(processes=n_cores, maxtasksperchild=100)
                 try:
                     # print(f"Optimisation of : {override}")
                     call_optimiser(
@@ -290,7 +290,7 @@ def run_router():
                 if opt_type == "deap_ga":
                     # initialize the Pool ONCE at the start
                     logger.info(f"Initializing persistent pool with {n_cores} cores.")
-                    global_pool = Pool(processes=n_cores)
+                    global_pool = Pool(processes=n_cores, maxtasksperchild=100)
                     try:
                         # print(f"Optimisation of : {override}")
                         run_hourly_optimisation(
@@ -368,7 +368,7 @@ def run_router():
                     logger.info("Design optimisation started !")
                     # initialize the Pool ONCE at the start
                     logger.info(f"Initializing persistent pool with {n_cores} cores.")
-                    global_pool = Pool(processes=n_cores)
+                    global_pool = Pool(processes=n_cores, maxtasksperchild=100)
 
                     try:
                         # print(f"Optimisation of : {override}")
