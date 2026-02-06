@@ -22,44 +22,15 @@ RESET = "\033[0m"  # No Color
 LIGHT_GRAY = "\033[2m"
 CRITICAL = "\033[0;31m"  # red
 
-# def canonicalize_overrides(overrides):
-#     """this canonicalize the overrides
-
-#     Args:
-#         overrides (dict): variables that need to overriden
-
-#     Returns:
-#         tuple: contains int and float based on type defined in override
-#     """
-#     return tuple(
-#         sorted(
-#             (
-#                 k,
-#                 int(v)
-#                 if isinstance(v, bool) or float(v).is_integer()
-#                 else round(float(v), 2),
-#             )
-#             for k, v in overrides.items()
-#         )
-#     )
-
-
-# def simulation_cache_key(parameters):
-#     canon = parameters["overrides"]
-#     digest = hashlib.sha256(repr(canon).encode()).hexdigest()
-#     return f"sim_{digest}"
-
-
-# setup the cache directory (it will be created automatically)
-# Setting mmap_mode='r' makes it very fast for large arrays
-# cachedir = os.path.join(os.getcwd(), "sim_cache")
-# memory = Memory(cachedir, verbose=0, mmap_mode="r")
+# Load JSON
+with open(CONFIG["json_file"], "r") as f:
+    data = json.load(f)
 
 
 def run_simulation(overrides: dict):
     """
-    The main entry point. It checks the cache status,
-    executes the core, and logs dynamically.
+    The main entry point. It executes the core,
+    and logs dynamically
     """
     # overrides = dict(sorted(overrides.items())) # sorted to ensure same order
 
@@ -88,20 +59,6 @@ def run_simulation(overrides: dict):
             f"{CRITICAL}[PENALISED]{RESET}Penalised with {CONFIG['penalty']:.0e} penality"
         )
 
-    # is_cached = duration < 0.2
-    # is_cached = _run_simulation_core.check_call_in_cache(overrides)
-
-    # dynamic Logging & Table
-    # status_tag = f"{CACHED}[CACHED]{RESET}" if is_cached else f"{NEW}[NEW RUN]{RESET}"
-
-    # log message changes dynamically
-    # if not is_cached:
-    # else:
-    # Optional: Just a one-line log for hits to keep the file clean
-    # logger.info(
-    # f"{status_tag} {LIGHT_GRAY}Hit - Parameters: {list(overrides.values())}{RESET}"
-    # )
-
     return result, penalty_flag
 
 
@@ -118,10 +75,6 @@ def _run_simulation_core(overrides: dict):
 
     # loads model with default values
     model = TP.default(CONFIG["model"])
-
-    # Load JSON
-    with open(CONFIG["json_file"], "r") as f:
-        data = json.load(f)
 
     # initial assignment of all variables from JSON
     for k, v in data.items():
