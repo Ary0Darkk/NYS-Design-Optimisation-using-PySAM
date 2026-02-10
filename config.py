@@ -25,6 +25,7 @@ CONFIG = {
     # "storage_block": "local-file-system/local-storage",
     "num_cores": None,
     "penalty": -1e13,
+    "run_tag": None,
     "USER_DEFINED_DAYS": {
         "winter": [(1, 8), (1, 13), (1, 16), (1, 28), (2, 21), (2, 22), (12, 12)],
         "summer": [(3, 9), (3, 16), (4, 12), (4, 17), (5, 7), (5, 16), (5, 21)],
@@ -62,6 +63,7 @@ CONFIG = {
         "ub": [12, 375, 350],
         "types": [int, int, int],
     },
+    "design_optimals":None,
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
     "random_seed": 41,

@@ -284,8 +284,10 @@ def run_router():
         # --------- operational ---------------------------------------------------
         elif route == "operational":
             is_nested = True
-
-            with mlflow.start_run(run_name="Operational optimisation"):
+            run_tag = CONFIG.get("run_tag")  # tags to denote something specific
+            r_name = f"{run_tag}-" if run_tag else ""
+            r_name += "Operational-optimisation"
+            with mlflow.start_run(run_name=r_name):
                 logger.info(f"{route} optimisation started !")
                 if opt_type == "deap_ga":
                     # initialize the Pool ONCE at the start
@@ -360,7 +362,10 @@ def run_router():
         elif route == "design_operational":
             is_nested = True  # informs mlflow for multi-step run
             # start a parent run to group everything
-            with mlflow.start_run(run_name="Sequential des-operational"):
+            run_tag = CONFIG.get("run_tag")
+            r_name = f"{run_tag}-" if run_tag else ""
+            r_name += "Sequential-des-operational"
+            with mlflow.start_run(run_name=r_name):
                 logger.info(
                     "Going to begin Design plus Operational optimisation sequentially!\n\n"
                 )
@@ -372,25 +377,38 @@ def run_router():
 
                     try:
                         # print(f"Optimisation of : {override}")
-                        optimals = call_optimiser(
-                            override=CONFIG["design"],
-                            optim_mode="design",
-                            target_hour=1,
-                            is_nested=is_nested,
-                            pool=global_pool,
-                        )
+                        if CONFIG.get("design_optimals", None) is not None:
+                            logger.info(
+                                "Using design_optimals from CONFIG; skipping initial optimizer call."
+                            )
+                            current_optimals = CONFIG["design_optimals"]
+                        else:
+                            logger.info(
+                                "No design_optimals found. Initializing design environment and optimizer..."
+                            )
+                            optimals_result = call_optimiser(
+                                override=CONFIG["design"],
+                                optim_mode="design",
+                                target_hour=1,
+                                is_nested=is_nested,
+                                pool=global_pool,
+                            )
+                            # call_optimiser returns (values, other data), we take index 0
+                            current_optimals = (
+                                optimals_result[0] if optimals_result else None
+                            )
 
-                        if optimals[0] is not None:
+                        # if we have valid optimal values
+                        if current_optimals is not None:
                             # Force every value to be a native Python float
                             static_override_dict = {
                                 name: float(val)
                                 for name, val in zip(
-                                    CONFIG["design"]["overrides"], optimals[0]
+                                    CONFIG["design"]["overrides"], current_optimals
                                 )
                             }
 
                             logger.info("Operational optimisation started !")
-                            # print(f"Optimisation of : {override}")
                             run_hourly_optimisation(
                                 override=CONFIG["operational"],
                                 optim_mode="operational",
@@ -421,50 +439,73 @@ def run_router():
                         f"Launching {n_cores} persistent RL worker environments..."
                     )
                     try:
-                        # Initialize env once with hour 1
-                        override = CONFIG["design"]
-                        rl_env = SubprocVecEnv(
-                            [
-                                make_env(
-                                    override["overrides"],
-                                    override["types"],
-                                    override["lb"],
-                                    override["ub"],
-                                    {},
-                                    1,
-                                    CONFIG["rl_max_steps"],
-                                    optim_mode="operational",
-                                    seed=CONFIG.get["random_seed"],
-                                )
-                                for _ in range(n_cores)
-                            ]
-                        )
-                        # print(f"Optimisation of : {override}")
-                        optimals = call_optimiser(
-                            override=override,
-                            optim_mode="design",
-                            target_hour=1,
-                            is_nested=is_nested,
-                            pool=rl_env,
-                        )
+                        # checks if we already have the optimal values to skip computation
+                        design_optimals = CONFIG.get("design_optimals")
 
-                        if optimals[0] is not None:
+                        if design_optimals is not None:
+                            logger.info(
+                                "Found design_optimals in CONFIG. Skipping initial optimizer."
+                            )
+                            current_optimals = design_optimals
+                        else:
+                            logger.info(
+                                "No design_optimals found. Initializing design environment and optimizer..."
+                            )
+
+                            # Initialize env ONLY if we need to optimize
+                            override_design = CONFIG["design"]
+                            rl_env_design = SubprocVecEnv(
+                                [
+                                    make_env(
+                                        override_design["overrides"],
+                                        override_design["types"],
+                                        override_design["lb"],
+                                        override_design["ub"],
+                                        {},
+                                        1,
+                                        CONFIG["rl_max_steps"],
+                                        optim_mode="operational",  # Keeping your original mode
+                                        seed=CONFIG.get("random_seed"),
+                                    )
+                                    for _ in range(n_cores)
+                                ]
+                            )
+
+                            optimals_result = call_optimiser(
+                                override=override_design,
+                                optim_mode="design",
+                                target_hour=1,
+                                is_nested=is_nested,
+                                pool=rl_env_design,
+                            )
+
+                            # Safely extract the results
+                            current_optimals = (
+                                optimals_result[0] if optimals_result else None
+                            )
+
+                            # cleans up the design env to free up HPC resources (optional but recommended)
+                            rl_env_design.close()
+
+                        # start Operational Optimization if we have results
+                        if current_optimals is not None:
                             # Force every value to be a native Python float
                             static_override_dict = {
                                 name: float(val)
                                 for name, val in zip(
-                                    CONFIG["design"]["overrides"], optimals[0]
+                                    CONFIG["design"]["overrides"], current_optimals
                                 )
                             }
-                            # Initialize env once with hour 1
-                            override = CONFIG["operational"]
-                            rl_env = SubprocVecEnv(
+
+                            # Initialize the operational environment
+                            override_op = CONFIG["operational"]
+                            rl_env_op = SubprocVecEnv(
                                 [
                                     make_env(
-                                        override["overrides"],
-                                        override["types"],
-                                        override["lb"],
-                                        override["ub"],
+                                        override_op["overrides"],
+                                        override_op["types"],
+                                        override_op["lb"],
+                                        override_op["ub"],
                                         static_override_dict,
                                         1,
                                         CONFIG["rl_max_steps"],
@@ -475,13 +516,12 @@ def run_router():
                             )
 
                             logger.info("Operational optimisation started !")
-                            # print(f"Optimisation of : {override}")
                             run_hourly_optimisation(
-                                override=override,
+                                override=override_op,
                                 optim_mode="operational",
                                 static_overrides=static_override_dict,
                                 is_nested=is_nested,
-                                pool=rl_env,
+                                pool=rl_env_op,
                             )
                         else:
                             logger.info("Design optimisation is not performed yet!")
