@@ -42,8 +42,8 @@ CONFIG = {
             "L_SCA",  # length of collector assembly
         ],
         # Bounds
-        "lb": [7000, 5, 2, 1, 50],
-        "ub": [9000, 25, 10, 15, 200],
+        "lb": [8000, 5, 2, 1, 50],
+        "ub": [12000, 25, 10, 15, 200],
         "types": [
             int,
             int,
@@ -63,7 +63,7 @@ CONFIG = {
         "ub": [12, 375, 350],
         "types": [int, int, int],
     },
-    "design_optimals":None,
+    "design_optimals": None,
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
     "random_seed": 41,
@@ -83,7 +83,6 @@ CONFIG = {
     "rl_gamma": 0.99,
     "rl_lr": 3e-1,
     "rl_checkpoint_freq": 10,
-    "rl_timesteps": 10,
     "rl_batch_size": 10,
     "rl_ent_coef": 0,
     # ------- other optimiser (not available) ------------------------------------------------
