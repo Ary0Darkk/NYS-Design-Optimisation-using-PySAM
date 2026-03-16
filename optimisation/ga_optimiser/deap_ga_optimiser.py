@@ -174,13 +174,13 @@ def run_deap_ga_optimisation(
                 mlflow.log_param("year", 2020)
                 mlflow.log_param("operating_start_hour", 7)
                 mlflow.log_param("operating_end_hour", 16)
-                mlflow.set_tag(f"hour_season", rec["season"])
+                mlflow.set_tag("hour_season", rec["season"])
                 mlflow.set_tag(
-                    f"hour_date",
+                    "hour_date",
                     f"{rec['day']:02d}-{rec['month']:02d}-2020",
                 )
                 mlflow.set_tag(
-                    f"hour_hod",
+                    "hour_hod",
                     f"{rec['hour_of_day']:02d}:00–{rec['hour_of_day'] + 1:02d}:00",
                 )
 

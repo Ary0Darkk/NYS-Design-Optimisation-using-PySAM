@@ -14,8 +14,8 @@ CONFIG = {
     "run_name": None,
     "session_time": datetime.now().strftime("%Y%m%d_%H%M%S"),
     "demand_file_path": "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx",
-    "show_demand_plot": True,
-    "show_price_plot": True,
+    "show_demand_plot": False,
+    "show_price_plot": False,
     "is_tuning": False,
     # ---- optimiser -> choose "deap_ga" or "rl_optim"-------
     "optimiser": "deap_ga",  # Initial guess

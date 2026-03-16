@@ -33,20 +33,24 @@ def run_simulation(overrides: dict):
     and logs dynamically
     """
     # overrides = dict(sorted(overrides.items())) # sorted to ensure same order
-
     duration = 0
     result = None
+    penalty_flag = False  # flag for penality; pysam model not executed
+
+    if not overrides:
+        display_params = {"Mode": "Baseline (System Defaults)"}
+    else:
+        display_params = overrides
     try:
         start = time.time()
         # run the actual simulation (joblib handles the loading)
         result = _run_simulation_core(overrides)
-        penalty_flag = False  # flag for penality; pysam model not executed
         duration = time.time() - start
         # Convert seconds to minutes and seconds
         mins, secs = divmod(duration, 60)
         # log message
         table = tb.tabulate(
-            [overrides.values()], headers=overrides.keys(), tablefmt="psql"
+            [display_params.values()], headers=display_params.keys(), tablefmt="psql"
         )
         logger.info(
             f"{NEW}[NEW RUN]{RESET} [{int(mins)}m {secs:05.2f}s] Ran sim with params :\n{table}"
@@ -143,6 +147,10 @@ def _run_simulation_core(overrides: dict):
         # "parasitic_power_condenser_operation": tp.Outputs.P_cooling_tower_tot,
         # NOTE: I am not taking Field collector optical end loss:EndLoss_ave for now!
         "annual_energy": model.Outputs.annual_energy,
+        "gross_annual_energy": model.Outputs.annual_W_cycle_gross,
+        "land_area": model.Outputs.total_land_area,
+        "land_cost": model.Outputs.csp_dtr_cost_plm_total,
+        "total_installed_cost": model.Outputs.total_installed_cost,
     }
 
     # logger.info("Outputs written to sim_result dict!")
