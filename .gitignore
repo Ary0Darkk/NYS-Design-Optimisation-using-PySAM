@@ -28,3 +28,4 @@ sim_cache
 mlflow.db
 mlartifacts
 plots
+sensitivity_analysis_plots

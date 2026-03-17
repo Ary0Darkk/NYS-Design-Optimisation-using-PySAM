@@ -22,15 +22,15 @@ class SolarOptimization:
         self.dynamic_price_series = self.full_price_df["dynamic_price"]
         self.symbol_map = {
             # --- Design Parameters ---
-            "specified_total_aperture": "ΣA",  # Sigma Area
-            "Row_Distance": "↔",  # Horizontal spacing
-            "ColperSCA": "⊞",  # Grid/Module count
-            "W_aperture": "w",  # Width
-            "L_SCA": "ℓ",  # Script length
+            "specified_total_aperture": "ΣA",  # Total aperture area
+            "Row_Distance": "↔",  # Row Distance
+            "ColperSCA": "⊞",  # num of Modules per SCA
+            "W_aperture": "w",  # Width of Aperture
+            "L_SCA": "ℓ",  # length of Collector
             # --- Operational Parameters ---
-            "m_dot": "ṁ",  # Standard physics notation for mass flow
-            "T_startup": "T↑",  # Temperature start
-            "T_shutdown": "T↓",  # Temperature stop
+            "m_dot": "ṁ",  # mass flow rate
+            "T_startup": "T↑",  # Startup Temperature
+            "T_shutdown": "T↓",  # Shutdown Temperature
         }
 
     def _prepare_dataframe(self, sim_result: dict) -> pd.DataFrame:
@@ -51,39 +51,44 @@ class SolarOptimization:
         df = self._prepare_dataframe(sim_result)
         price_values = self.dynamic_price_series.values.flatten()
 
-        gross_energy = (
-            df["hourly_energy"] * self.config.KW_CONVERSION * price_values
-        ).sum()
+        # Use nan_to_num to treat hourly errors as 0 penalty/energy
+        hourly_energy = np.nan_to_num(df["hourly_energy"].values)
 
-        penalties_val = (
-            (
-                df["field_htf_pump_power"]
-                + df["pc_htf_pump_power"]
-                + df["field_collector_tracking_power"]
-            )
-            * self.config.KW_CONVERSION
-            + (
-                df["pc_startup_thermal_power"]
-                + df["field_piping_thermal_loss"]
-                + df["receiver_thermal_loss"]
-            )
-            * self.config.MWT_TO_MWE
-            * self.config.KW_CONVERSION
-        ).values.flatten() * price_values
-        penalties_total = penalties_val.sum()
+        elec_power = np.nan_to_num(
+            df["field_htf_pump_power"].values
+            + df["pc_htf_pump_power"].values
+            + df["field_collector_tracking_power"].values
+        )
+
+        thermal_loss = np.nan_to_num(
+            df["pc_startup_thermal_power"].values
+            + df["field_piping_thermal_loss"].values
+            + df["receiver_thermal_loss"].values
+        )
+
+        gross_energy = np.sum(hourly_energy * self.config.KW_CONVERSION * price_values)
+
+        losses = (
+            (elec_power * self.config.KW_CONVERSION)
+            + (thermal_loss * self.config.MWT_TO_MWE * self.config.KW_CONVERSION)
+        ) * price_values
+
+        losses_total = np.sum(losses)
 
         total_installed_cost = float(sim_result["total_installed_cost"])
-        annualised_cost = (
+        penality = (
             total_installed_cost
             * self.config.USD_TO_INR
             / self.config.LAND_EXPECTANCY_YEARS
         )
 
+        net_objective = gross_energy - losses_total - penality
+
         return {
-            "Net Objective": gross_energy - penalties_total - annualised_cost,
+            "Net Objective": net_objective,
             "Gross Value": gross_energy,
-            "Penalties": penalties_total,
-            "Total Installed Cost": annualised_cost,
+            "Losses": losses_total,
+            "Penality": penality,
         }
 
     def run(self, sweep_config: dict):
@@ -118,8 +123,8 @@ class SolarOptimization:
         metrics_to_plot = [
             ("Net Objective", "#1f77b4"),
             ("Gross Value", "#2ca02c"),
-            ("Penalties", "#ff7f0e"),
-            ("Total Installed Cost", "#d62728"),
+            ("Losses", "#ff7f0e"),
+            ("Penality", "#d62728"),
         ]
         # Define and create the output directory using pathlib
         output_dir = Path("sensitivity_analysis_plots")
@@ -142,14 +147,22 @@ class SolarOptimization:
                 label=label,
             )
 
+            # Tight Annotations (Raw Y-values)
             for i, row in df_sweep.iterrows():
-                y_offset = 12 if i % 2 == 0 else -18
+                y_val = row[label]
+
+                # Combine parameter label and raw numerical result
+                annotation_text = f"{row['bracket_label']}\n{y_val}"
+
+                # Alternate offset to prevent overlap; slightly larger for 2-line text
+                y_offset = 18 if i % 2 == 0 else -28
+
                 ax.annotate(
-                    row["bracket_label"],
-                    xy=(i, row[label]),
+                    annotation_text,
+                    xy=(i, y_val),
                     xytext=(0, y_offset),
                     textcoords="offset points",
-                    fontsize=7.5,
+                    fontsize=7,
                     ha="center",
                     va="bottom" if y_offset > 0 else "top",
                     bbox=dict(
@@ -201,5 +214,5 @@ class SolarOptimization:
 
 if __name__ == "__main__":
     optimizer = SolarOptimization()
-    config = {"Row_Distance": (6, 18, 6)}
+    config = {"Row_Distance": (5, 30, 5)}
     optimizer.run(config)
