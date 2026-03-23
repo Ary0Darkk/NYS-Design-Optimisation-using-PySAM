@@ -20,17 +20,16 @@ class SolarOptimization:
         self.config = SolarConfig()
         self.full_price_df = get_dynamic_price()
         self.dynamic_price_series = self.full_price_df["dynamic_price"]
+
         self.symbol_map = {
-            # --- Design Parameters ---
-            "specified_total_aperture": "ΣA",  # Total aperture area
-            "Row_Distance": "↔",  # Row Distance
-            "ColperSCA": "⊞",  # num of Modules per SCA
-            "W_aperture": "w",  # Width of Aperture
-            "L_SCA": "ℓ",  # length of Collector
-            # --- Operational Parameters ---
-            "m_dot": "ṁ",  # mass flow rate
-            "T_startup": "T↑",  # Startup Temperature
-            "T_shutdown": "T↓",  # Shutdown Temperature
+            "specified_total_aperture": "ΣA",
+            "Row_Distance": "↔",
+            "ColperSCA": "⊞",
+            "W_aperture": "w",
+            "L_SCA": "ℓ",
+            "m_dot": "ṁ",
+            "T_startup": "T↑",
+            "T_shutdown": "T↓",
         }
 
     def _prepare_dataframe(self, sim_result: dict) -> pd.DataFrame:
@@ -51,7 +50,6 @@ class SolarOptimization:
         df = self._prepare_dataframe(sim_result)
         price_values = self.dynamic_price_series.values.flatten()
 
-        # Use nan_to_num to treat hourly errors as 0 penalty/energy
         hourly_energy = np.nan_to_num(df["hourly_energy"].values)
 
         elec_power = np.nan_to_num(
@@ -98,26 +96,27 @@ class SolarOptimization:
 
         sweep_data = []
 
-        # --- Baseline Calculation (Included in Plot) ---
+        # Baseline (optional — won't be plotted in x-axis)
         base_res, _ = run_simulation(overrides={})
         base_metrics = self.calculate_objective(base_res)
-        base_metrics["bracket_label"] = "Baseline"
+        base_metrics["baseline"] = True
         sweep_data.append(base_metrics)
 
-        # --- Sweep Calculation ---
+        # Sweep
         for combo in combinations:
             current_overrides = dict(zip(keys, combo))
             sim_res, _ = run_simulation(overrides=current_overrides)
             metrics = self.calculate_objective(sim_res)
 
-            label_parts = [
-                f"{self.symbol_map.get(k, k)}: {v}"
-                for k, v in current_overrides.items()
-            ]
-            metrics["bracket_label"] = f"({', '.join(label_parts)})"
+            # ✅ STORE VARIABLE VALUES (CRUCIAL FIX)
+            for k, v in current_overrides.items():
+                metrics[k] = v
+
+            metrics["baseline"] = False
             sweep_data.append(metrics)
 
-        self._plot_large_multi_graphs(pd.DataFrame(sweep_data), sweep_config)
+        df = pd.DataFrame(sweep_data)
+        self._plot_large_multi_graphs(df, sweep_config)
 
     def _plot_large_multi_graphs(self, df_sweep, sweep_config):
         metrics_to_plot = [
@@ -126,93 +125,77 @@ class SolarOptimization:
             ("Losses", "#ff7f0e"),
             ("Penality", "#d62728"),
         ]
-        # Define and create the output directory using pathlib
+
         output_dir = Path("sensitivity_analysis_plots")
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        config_names = "_".join(sweep_config.keys())
+        var_name = list(sweep_config.keys())[0]
+        symbol = self.symbol_map.get(var_name, var_name)
+
+        df_plot = df_sweep[~df_sweep["baseline"]].copy()
+        df_plot = df_plot.sort_values(by=var_name)
+
+        x_values = df_plot[var_name].values
 
         for label, color in metrics_to_plot:
-            fig, ax = plt.subplots(figsize=(14, 7), dpi=100)
-            x_indices = np.arange(len(df_sweep))
+            fig, ax = plt.subplots(figsize=(8, 4.5), dpi=300)  # smaller, paper-friendly
 
             ax.plot(
-                x_indices,
-                df_sweep[label],
-                color=color,
+                x_values,
+                df_plot[label],
                 marker="o",
-                linewidth=2,
-                markersize=8,
-                alpha=0.8,
-                label=label,
+                linewidth=1.8,
+                markersize=4,
+                color=color,
             )
 
-            # Tight Annotations (Raw Y-values)
-            for i, row in df_sweep.iterrows():
-                y_val = row[label]
-
-                # Combine parameter label and raw numerical result
-                annotation_text = f"{row['bracket_label']}\n{y_val}"
-
-                # Alternate offset to prevent overlap; slightly larger for 2-line text
-                y_offset = 18 if i % 2 == 0 else -28
+            # SPARSE ANNOTATION (only every 3rd point)
+            for i, (x, y) in enumerate(zip(x_values, df_plot[label])):
+                # Alternate vertical offsets to avoid overlap
+                offset = 6 if i % 2 == 0 else -10
 
                 ax.annotate(
-                    annotation_text,
-                    xy=(i, y_val),
-                    xytext=(0, y_offset),
+                    f"{y:.1e}",
+                    (x, y),
                     textcoords="offset points",
-                    fontsize=7,
+                    xytext=(0, offset),
                     ha="center",
-                    va="bottom" if y_offset > 0 else "top",
-                    bbox=dict(
-                        boxstyle="round,pad=0.2", fc="white", ec=color, lw=1, alpha=0.8
-                    ),
+                    va="bottom" if offset > 0 else "top",
+                    fontsize=6,
                 )
 
-            ax.set_xticks(x_indices)
-            # Label S1 as Baseline
-            xtick_labels = [
-                f"S{i + 1}\n(Base)" if i == 0 else f"S{i + 1}" for i in x_indices
-            ]
-            ax.set_xticklabels(xtick_labels, fontsize=9)
+            # Labels (smaller font)
+            ax.set_xlabel(f"{symbol} ({var_name})", fontsize=9)
+            ax.set_ylabel("COST (INR)", fontsize=9)
 
-            ax.margins(x=0.05, y=0.18)
-            ax.set_title(f"Analysis: {label}", fontsize=14, fontweight="bold", pad=15)
-            ax.set_ylabel("COST (in INR)", fontsize=10)
-            ax.grid(True, axis="y", linestyle=":", alpha=0.5)
-
-            # Build legend with symbols
-            handles, labels = ax.get_legend_handles_labels()
-            for k in sweep_config.keys():
-                symbol = self.symbol_map.get(k, k)
-                handles.append(
-                    plt.Line2D([0], [0], color="none", label=f"{symbol}: {k}")
-                )
-
-            # Place legend at the top, spread across 4 columns to save vertical space
-            ax.legend(
-                handles=handles,
-                loc="upper center",
-                bbox_to_anchor=(0.5, 1.0),
-                ncol=3,
-                fontsize=8,
-                frameon=True,
-                edgecolor="gray",
-                title="Scenario Key",
-                title_fontsize="9",
+            ax.set_title(
+                f"{label} vs {var_name}",
+                fontsize=10,
+                fontweight="bold",
             )
 
-            plt.tight_layout()
-            clean_label = label.lower().replace(" ", "_")
-            file_name = f"{config_names}_analysis_{clean_label}.png"
-            save_path = output_dir / file_name
-            plt.savefig(save_path, bbox_inches="tight")
-            print(f"Saved: {save_path}")
+            # Clean ticks
+            ax.tick_params(axis="both", labelsize=8)
+
+            # Grid (subtle)
+            ax.grid(True, linestyle="--", alpha=0.4)
+
+            # Remove clutter
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+
+            # Tight layout for paper
+            plt.tight_layout(pad=1)
+
+            file_name = f"{var_name}_{label.lower().replace(' ', '_')}.png"
+            plt.savefig(output_dir / file_name)
             plt.show()
 
 
 if __name__ == "__main__":
     optimizer = SolarOptimization()
-    config = {"Row_Distance": (5, 30, 5)}
+
+    # SINGLE VARIABLE SWEEP (STRICT)
+    config = {"m_dot": (2, 12, 1)}
+
     optimizer.run(config)
