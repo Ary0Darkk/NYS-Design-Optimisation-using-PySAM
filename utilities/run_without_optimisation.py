@@ -30,6 +30,7 @@ class SolarOptimization:
             "m_dot": "ṁ",
             "T_startup": "T↑",
             "T_shutdown": "T↓",
+            "specified_solar_multiple": "SM",
         }
 
     def _prepare_dataframe(self, sim_result: dict) -> pd.DataFrame:
