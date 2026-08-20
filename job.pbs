@@ -1,7 +1,9 @@
 #!/bin/bash
 #PBS -N NYS_PySAM_Optimization
-#PBS -q small
+#PBS -q medium
+#PBS -J 1-100
 #PBS -l select=1:ncpus=112:mpiprocs=112
+#PBS -l place=pack
 #PBS -j oe
 #PBS -M 23b0343@iitb.ac.in
 #PBS -m abe
@@ -24,6 +26,11 @@ source .venv/bin/activate
 
 # Use the environment variable PBS provides to be safe
 export APP_CPU_COUNT=$PBS_NCPUS
+
+# avoid inherent parallelism
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 
 # Execution 
 echo "Starting optimization on $(hostname) using $APP_CPU_COUNT CPUs..."

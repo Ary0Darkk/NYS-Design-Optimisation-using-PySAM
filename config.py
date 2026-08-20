@@ -19,13 +19,13 @@ CONFIG = {
     "is_tuning": False,
     # ---- optimiser -> choose "deap_ga" or "rl_optim"-------
     "optimiser": "deap_ga",  # Initial guess
-    "route": "design_operational",  # "design" or "operational" or "design_operational"
     "resume_from_checkpoint": False,
-    "refresh_cache": True,
+    # "refresh_cache": True,
     # "storage_block": "local-file-system/local-storage",
     "num_cores": None,
     "penalty": -1e13,
     "run_tag": None,
+    "num_days": 2,
     "USER_DEFINED_DAYS": {
         "winter": [(1, 8), (1, 13), (1, 16), (1, 28), (2, 21), (2, 22), (12, 12)],
         "summer": [(3, 9), (3, 16), (4, 12), (4, 17), (5, 7), (5, 16), (5, 21)],

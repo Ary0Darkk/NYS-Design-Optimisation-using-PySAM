@@ -149,41 +149,20 @@ def deserialize_population(serialized, toolbox):
 # -------- MAIN GA TASK ----------------------
 def run_deap_ga_optimisation(
     override: dict,
-    optim_mode: str,
-    static_overrides: dict[str, float],
-    is_nested: bool,
-    curr_hour: int,
+    current_day: int,
     pool,
-    rec,
 ):
     try:
         timestamp = CONFIG["session_time"]
-        if optim_mode == "design":
-            run_name = "GA_Design_optimisation"
-        else:
-            run_name = f"GA_hour_{curr_hour}"
 
-        if mlflow.active_run() and not is_nested:
+        run_name = f"GA_day_{current_day}"
+
+        if mlflow.active_run():
             mlflow.end_run()
 
-        with mlflow.start_run(run_name=run_name, nested=is_nested):
+        with mlflow.start_run(run_name=run_name, nested=True):
             mlflow.set_tag("Author", CONFIG["author"])
             mlflow.log_artifact("config.py")
-            if optim_mode == "operational":
-                mlflow.set_tag("hour", curr_hour)
-                mlflow.log_param("year", 2020)
-                mlflow.log_param("operating_start_hour", 7)
-                mlflow.log_param("operating_end_hour", 16)
-                mlflow.set_tag("hour_season", rec["season"])
-                mlflow.set_tag(
-                    "hour_date",
-                    f"{rec['day']:02d}-{rec['month']:02d}-2020",
-                )
-                mlflow.set_tag(
-                    "hour_hod",
-                    f"{rec['hour_of_day']:02d}:00–{rec['hour_of_day'] + 1:02d}:00",
-                )
-
             # ----------------------------
             # Read configuration
             # ----------------------------
@@ -238,11 +217,9 @@ def run_deap_ga_optimisation(
             toolbox.register(
                 "evaluate",
                 deap_fitness,
-                optim_mode=optim_mode,
-                hour=curr_hour,
+                hour=current_day,
                 var_names=var_names,
                 var_types=var_types,
-                static_overrides=static_overrides,
             )
             toolbox.register(
                 "select",
@@ -280,7 +257,6 @@ def run_deap_ga_optimisation(
             ckpt_key = hashlib.sha256(
                 json.dumps(
                     {
-                        "optim_mode": optim_mode,
                         "vars": var_names,
                         "types": [t.__name__ for t in var_types],
                         "lb": lb,
@@ -290,7 +266,6 @@ def run_deap_ga_optimisation(
                         "cxpb": cxpb,
                         "mutpb": mutpb,
                         "indpb": indpb,
-                        "static_overrides": static_overrides,
                     },
                     sort_keys=True,
                 ).encode()
@@ -312,8 +287,7 @@ def run_deap_ga_optimisation(
             # )
 
             # BASE_DIR = Path(__file__).resolve().parents[1] # Directory of the current script
-            sub_path = "GA_design" if optim_mode == "design" else "GA_operational"
-            checkpoint_dir = Path(f"checkpoints/GA/{sub_path}/{ckpt_key}")
+            checkpoint_dir = Path(f"checkpoints/GA/{ckpt_key}")
 
             resume_file = Path(f"{checkpoint_dir}/checkpoint_latest.pkl")
             resume_file.parent.mkdir(parents=True, exist_ok=True)
@@ -366,14 +340,9 @@ def run_deap_ga_optimisation(
             max_fitness_log = []
             avg_fitness_log = []
 
-            if optim_mode == "design":
-                plot_path = Path(
-                    f"plots/GA_plots/GA_design_fitness_vs_gen_{timestamp}.png"
-                )
-            else:
-                plot_path = Path(
-                    f"plots/GA_plots/GA_operational_{curr_hour}_fitness_vs_gen_{timestamp}.png"
-                )
+            plot_path = Path(
+                f"plots/GA_plots/{current_day}_fitness_vs_gen_{timestamp}.png"
+            )
             plot_path.parent.mkdir(parents=True, exist_ok=True)
             # ----------- GA loop ------------------------------------
             for gen in range(start_gen, num_generations):
@@ -416,9 +385,9 @@ def run_deap_ga_optimisation(
                 mlflow.log_metrics(
                     {
                         name: v_type(
-                            max(l, min(u, round(val) if v_type is int else val))
+                            max(lb, min(ub, round(val) if v_type is int else val))
                         )
-                        for name, v_type, l, u, val in zip(
+                        for name, v_type, lb, ub, val in zip(
                             var_names, var_types, lb, ub, best_ind
                         )
                     },
@@ -510,48 +479,30 @@ def run_deap_ga_optimisation(
             # ------ console output -------------------
             res_dict = {}
             header_line = "-" * 40
-            if optim_mode == "design":
-                for i, name in enumerate(var_names):
-                    val = best_solution[i]
-                    res_dict[name] = val  # stores in dict to save data in csv
 
-                res_dict["best_fitness"] = best_fitness
-                #  formats output
-                res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
-                logger.info(
-                    f"\n{header_line}\n"
-                    f"GA DESIGN OPTIMAL SOLUTIONS\n"
-                    f"{header_line}\n"
-                    f"Final Best Results\n"
-                    f"{res_table}"
-                )
-            else:
-                res_dict["hour"] = curr_hour
-                for i, name in enumerate(var_names):
-                    val = best_solution[i]
-                    res_dict[name] = val  # stores in dict to save data in csv
+            res_dict["day"] = current_day
+            for i, name in enumerate(var_names):
+                val = best_solution[i]
+                res_dict[name] = val  # stores in dict to save data in csv
 
-                res_dict["best_fitness"] = best_fitness
+            res_dict["best_fitness"] = best_fitness
 
-                # formats output
-                res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
-                logger.info(
-                    f"\n{header_line}\n"
-                    f"GA Optimal solution (hour {curr_hour})\n"
-                    f"{header_line}\n"
-                    f"Final Best Results\n"
-                    f"{res_table}"
-                )
+            # formats output
+            res_table = tb.tabulate(res_dict.items(), tablefmt="grid")
+            logger.info(
+                f"\n{header_line}\n"
+                f"GA Optimal solution (day {current_day})\n"
+                f"{header_line}\n"
+                f"Final Best Results\n"
+                f"{res_table}"
+            )
 
             # mlflow.log_metrics(res_dict)
             result_logbook = pd.DataFrame([res_dict])
             result_logbook.index = result_logbook.index + 1
             result_logbook.index.name = "serial"
 
-            if optim_mode == "design":
-                file_name = Path(f"results/GA_results/GA_design_{timestamp}.csv")
-            else:
-                file_name = Path(f"results/GA_results/GA_operational_{timestamp}.csv")
+            file_name = Path(f"results/GA_results/{timestamp}.csv")
             file_name.parent.mkdir(parents=True, exist_ok=True)
 
             file_exists = file_name.exists()
