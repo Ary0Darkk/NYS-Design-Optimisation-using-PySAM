@@ -188,3 +188,14 @@ config fixed for now:
         "ub": [12, 375, 350],
         "types": [int, int, int],
     },
+
+2026- 9 -25
+Now we have clear direction to proceed, that is performing both the design and operational optimisation simultaneously.
+
+2026 - 10 -06
+As we can't proceed with having 28 Nodes, all at once. We will take another path of doing it season-wise and it also makes it kinda easy to document over MLflow.
+Now question is how can I bring them beautifully over MLflow.
+
+4 jobs --> each of 7 nodes --> each node has 112 cores --> 16 individuals can be handled at once --> as we have 7 nodes therefore all can be handled at once --> 3min/simulation --> 3min * 100 = 300/60 = 5 hrs for one season
+each season has 7 representative days
+therefore -> require 7 processes

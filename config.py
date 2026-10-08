@@ -16,17 +16,10 @@ CONFIG = {
     "demand_file_path": "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx",
     "show_demand_plot": False,
     "show_price_plot": False,
-    "is_tuning": False,
-    # ---- optimiser -> choose "deap_ga" or "rl_optim"-------
-    "optimiser": "deap_ga",  # Initial guess
-    "resume_from_checkpoint": False,
-    # "refresh_cache": True,
-    # "storage_block": "local-file-system/local-storage",
-    "num_cores": None,
+    # ---- optimiser -------
+    "resume_from_checkpoint": True,
     "penalty": -1e13,
-    "run_tag": None,
-    "num_days": 2,
-    "USER_DEFINED_DAYS": {
+    "SEASONS": {
         "winter": [(1, 8), (1, 13), (1, 16), (1, 28), (2, 21), (2, 22), (12, 12)],
         "summer": [(3, 9), (3, 16), (4, 12), (4, 17), (5, 7), (5, 16), (5, 21)],
         "monsoon": [(6, 13), (7, 6), (7, 15), (7, 22), (7, 23), (8, 4), (8, 11)],
@@ -63,14 +56,14 @@ CONFIG = {
         "ub": [12, 375, 350],
         "types": [int, int, int],
     },
-    "design_optimals": None,
+    # "design_optimals": None,
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
     "random_seed": 41,
     "tournament_size": 7,
-    "pop_size": 100,  # polulation size
+    "pop_size": 112,  # polulation size
     "hall_of_fame_size": 5,  # elites we preserve from each gen
-    "num_generations": 30,
+    "num_generations": 100,
     "cxpb": 0.8,  # prob of mating an ind
     "mutpb": 0.2,  # prob of mutating an ind
     "indpb": 0.1,  # decides how much a chosen individual changes,generally 1/num of variables
