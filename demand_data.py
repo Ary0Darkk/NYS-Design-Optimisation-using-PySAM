@@ -8,21 +8,21 @@ from config import CONFIG
 def format_data(file_path: str, show_demand_plot: bool):
     df = pd.read_excel(Path(file_path))
 
-    df_2024 = df[df["State"] == "Maharashtra - 2024"].copy()
+    df_2020 = df[df["State"] == "Haryana - 2020"].copy()
 
-    df_2024["DateTime"] = pd.to_datetime(
-        "2024-" + df_2024["Date"], format="%Y-%d-%b %I%p"
+    df_2020["DateTime"] = pd.to_datetime(
+        "2020-" + df_2020["Date"], format="%Y-%d-%b %I%p"
     )
 
     # Create a boolean mask where Month is 2 (February) AND Day is 29.
-    is_leap_day = (df_2024["DateTime"].dt.month == 2) & (
-        df_2024["DateTime"].dt.day == 29
+    is_leap_day = (df_2020["DateTime"].dt.month == 2) & (
+        df_2020["DateTime"].dt.day == 29
     )
 
     # Use the NOT operator (~) to keep all rows EXCEPT those that are the leap day.
-    df_2024_no_leap = df_2024[~is_leap_day].copy()
+    df_2020_no_leap = df_2020[~is_leap_day].copy()
 
-    formatted_demand_df = df_2024_no_leap[
+    formatted_demand_df = df_2020_no_leap[
         ["DateTime", "Hourly Demand Met (in MW)"]
     ].reset_index(drop=True)
 
@@ -92,18 +92,18 @@ def get_dynamic_price() -> pd.DataFrame:
         plt.grid(True)
         plt.show()
 
-    # print(dynamic_price_data.head())
-    # print(type(dynamic_price_data))
-    # print(len(dynamic_price_data))
+    print(dynamic_price_data.head())
+    print(type(dynamic_price_data))
+    print(len(dynamic_price_data))
 
-    # print(len(formatted_data))
-    # print(type(formatted_data))
-    # print(type(dynamic_price_data_df))
-    # print(len(dynamic_price_data_df))
+    print(len(formatted_data))
+    print(type(formatted_data))
+    print(type(dynamic_price_data_df))
+    print(len(dynamic_price_data_df))
 
-    # print(final_dataset.head(10))
-    # print(final_dataset.tail(10))
-    # print(type(final_dataset))
+    print(final_dataset.head(10))
+    print(final_dataset.tail(10))
+    print(type(final_dataset))
 
     return final_dataset
 
@@ -111,7 +111,7 @@ def get_dynamic_price() -> pd.DataFrame:
 def save_data():
     final_dataset = get_dynamic_price()
 
-    final_dataset.to_csv(Path("electricity_data/dynamic_price_data.csv"))
+    final_dataset.to_csv(Path("electricity_data/dynamic_price_data_haryana.csv"))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ CONFIG = {
     "author": "Aryan",
     "run_name": None,
     "session_time": datetime.now().strftime("%Y%m%d_%H%M%S"),
-    "demand_file_path": "electricity_data/Yearly_Demand_Profile_state_mahrastra_and_manipur.xlsx",
+    "demand_file_path": "electricity_data/Yearly Demand Profile Haryana-Himanchal.xlsx",
     "show_demand_plot": False,
     "show_price_plot": False,
     # ---- optimiser -------

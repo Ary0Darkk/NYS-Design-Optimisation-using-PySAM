@@ -6,7 +6,7 @@ from demand_data import get_dynamic_price
 
 @lru_cache(maxsize=1)
 def get_cached_dynamic_price():
-    file_path = Path("electricity_data/dynamic_price_data.csv")
+    file_path = Path("electricity_data/dynamic_price_data_haryana.csv")
 
     if file_path.exists():
         df = pd.read_csv(file_path)
