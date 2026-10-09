@@ -1,157 +1,247 @@
 import json
-import PySAM.TroughPhysical as TP
-import tabulate as tb
+import logging
 import time
+from pathlib import Path
+from numbers import Real
+
+import PySAM.TroughPhysical as TP
 
 from config import CONFIG
 from utilities.list_nesting import replace_1st_order
 from utilities.setup_custom_logger import setup_custom_logger
 
-import logging
 
-# Set up logging if not already done
-if not logging.getLogger("NYS_Optimisation").hasHandlers():
+# --------------------------------------------------
+# Logger setup
+# --------------------------------------------------
+
+LOGGER_NAME = "NYS_Optimisation"
+logger = logging.getLogger(LOGGER_NAME)
+
+if not logger.hasHandlers():
     logger = setup_custom_logger()
-else:
-    logger = logging.getLogger("NYS_Optimisation")
 
-# Define codes
-NEW = "\033[0;36m"  # Cyan
-CACHED = "\033[0;32m"  # Green
-RESET = "\033[0m"  # No Color
-LIGHT_GRAY = "\033[2m"
-CRITICAL = "\033[0;31m"  # red
 
-# Load JSON
-with open(CONFIG["json_file"], "r") as f:
-    data = json.load(f)
+# --------------------------------------------------
+# Load JSON defaults once per Python process
+# --------------------------------------------------
+
+
+def load_json_defaults():
+    """Load the PySAM model defaults from the configured JSON file."""
+
+    json_path = Path(CONFIG["json_file"])
+
+    with json_path.open("r", encoding="utf-8") as file:
+        defaults = json.load(file)
+
+    if not isinstance(defaults, dict):
+        raise ValueError(
+            f"Expected a JSON object in {json_path}, got {type(defaults).__name__}"
+        )
+
+    return defaults
+
+
+JSON_DEFAULTS = load_json_defaults()
+
+
+# --------------------------------------------------
+# Prepare simulation overrides
+# --------------------------------------------------
+
+
+def normalize_overrides(overrides: dict) -> dict:
+    """
+    Copy overrides and expand m_dot into the minimum
+    and maximum HTF mass-flow parameters.
+    """
+
+    if overrides is None:
+        return {}
+
+    if not isinstance(overrides, dict):
+        raise TypeError("overrides must be a dictionary.")
+
+    normalized = dict(overrides)
+
+    if "m_dot" in normalized:
+        m_dot = normalized.pop("m_dot")
+
+        # Preserve explicitly supplied bounds if present.
+        normalized.setdefault("m_dot_htfmin", m_dot)
+        normalized.setdefault("m_dot_htfmax", m_dot)
+
+    return normalized
+
+
+# --------------------------------------------------
+# Initialize PySAM model
+# --------------------------------------------------
+
+
+def initialize_model():
+    """
+    Create a fresh PySAM model and apply JSON defaults.
+
+    Unsupported JSON default keys are collected and reported
+    rather than silently ignored.
+    """
+
+    model = TP.default(CONFIG["model"])
+    failed_defaults = []
+
+    for key, value in JSON_DEFAULTS.items():
+        if key == "number_inputs":
+            continue
+
+        try:
+            model.value(key, value)
+        except Exception as exc:
+            failed_defaults.append((key, str(exc)))
+
+    if failed_defaults:
+        failed_keys = [key for key, _ in failed_defaults]
+
+        logger.warning(
+            "Could not apply %d JSON defaults: %s",
+            len(failed_keys),
+            failed_keys,
+        )
+
+        if CONFIG.get("strict_json_defaults", False):
+            raise ValueError(f"Failed to apply JSON defaults: {failed_keys}")
+
+    return model
+
+
+# --------------------------------------------------
+# Apply optimization parameters
+# --------------------------------------------------
+
+
+def apply_overrides(model, overrides: dict):
+    """
+    Apply scalar overrides or replace the first element
+    of an existing sequence, preserving the original behavior.
+    """
+
+    for key, value in overrides.items():
+        try:
+            current_value = model.value(key)
+        except Exception as exc:
+            raise ValueError(f"Unknown or inaccessible PySAM parameter: {key}") from exc
+
+        # Scalar parameters
+        if isinstance(current_value, (Real, bool)):
+            model.value(key, value)
+
+        # Sequence parameters: replace first element
+        elif isinstance(current_value, (list, tuple)):
+            if len(current_value) > 0:
+                new_value = replace_1st_order(
+                    data=current_value,
+                    new_val=value,
+                )
+            elif isinstance(current_value, tuple):
+                new_value = (value,)
+            else:
+                new_value = [value]
+
+            model.value(key, new_value)
+
+        else:
+            raise TypeError(
+                f"Unsupported parameter type for '{key}': "
+                f"{type(current_value).__name__}"
+            )
+
+
+# --------------------------------------------------
+# Execute PySAM simulation
+# --------------------------------------------------
+
+
+def _run_simulation_core(overrides: dict) -> dict:
+    """Execute one fresh PySAM simulation."""
+
+    normalized = normalize_overrides(overrides)
+
+    model = initialize_model()
+    apply_overrides(model, normalized)
+
+    model.execute()
+
+    outputs = model.Outputs
+
+    # Preserve the output interface used by the optimizer.
+    return {
+        "hourly_energy": outputs.P_cycle,
+        "pc_htf_pump_power": outputs.cycle_htf_pump_power,
+        "field_htf_pump_power": outputs.W_dot_field_pump,
+        "field_collector_tracking_power": outputs.W_dot_sca_track,
+        "pc_startup_thermal_power": outputs.q_dot_pc_startup,
+        "field_piping_thermal_loss": outputs.q_dot_piping_loss,
+        "receiver_thermal_loss": outputs.q_dot_rec_thermal_loss,
+        "annual_energy": outputs.annual_energy,
+        "gross_annual_energy": outputs.annual_W_cycle_gross,
+        "land_area": outputs.total_land_area,
+        "land_cost": outputs.csp_dtr_cost_plm_total,
+        "total_installed_cost": outputs.total_installed_cost,
+    }
+
+
+# --------------------------------------------------
+# Public simulation entry point
+# --------------------------------------------------
 
 
 def run_simulation(overrides: dict):
     """
-    The main entry point. It executes the core,
-    and logs dynamically
+    Run one simulation.
+
+    Returns:
+        (result, penalty_flag)
+
+        result:
+            Dictionary of simulation outputs on success,
+            otherwise None.
+
+        penalty_flag:
+            False on success, True on failure.
     """
-    # overrides = dict(sorted(overrides.items())) # sorted to ensure same order
-    duration = 0
-    result = None
-    penalty_flag = False  # flag for penality; pysam model not executed
 
-    if not overrides:
-        display_params = {"Mode": "Baseline (System Defaults)"}
-    else:
-        display_params = overrides
+    display_params = overrides or {"Mode": "Baseline"}
+
+    start_time = time.perf_counter()
+
     try:
-        start = time.time()
-        # run the actual simulation (joblib handles the loading)
-        result = _run_simulation_core(overrides)
-        duration = time.time() - start
-        # Convert seconds to minutes and seconds
-        mins, secs = divmod(duration, 60)
-        # log message
-        table = tb.tabulate(
-            [display_params.values()], headers=display_params.keys(), tablefmt="psql"
+        result = _run_simulation_core(overrides or {})
+        duration = time.perf_counter() - start_time
+
+        # Avoid large multi-column tables in high-volume GA logs.
+        if CONFIG.get("log_each_simulation", False):
+            logger.info(
+                "Simulation completed in %.2f s | Parameters: %s",
+                duration,
+                display_params,
+            )
+
+        return result, False
+
+    except Exception:
+        duration = time.perf_counter() - start_time
+
+        logger.error(
+            "Simulation failed after %.2f s | Parameters: %s",
+            duration,
+            display_params,
+            exc_info=True,
         )
-        logger.info(
-            f"{NEW}[NEW RUN]{RESET} [{int(mins)}m {secs:05.2f}s] Ran sim with params :\n{table}"
-        )
-    except Exception as e:
-        logger.critical(f"Sim exited with params : {overrides}")
-        logger.critical(f"Model exited with error: {e}")
-        penalty_flag = True
-        logger.info(
-            f"{CRITICAL}[PENALISED]{RESET}Penalised with {CONFIG['penalty']:.0e} penality"
+
+        logger.warning(
+            "Applying penalty: %.0e",
+            CONFIG["penalty"],
         )
 
-    return result, penalty_flag
-
-
-def _run_simulation_core(overrides: dict):
-    overrides = dict(overrides)
-
-    # handle mass flow rate values
-    for key, value in overrides.items():
-        if key == "m_dot":
-            overrides["m_dot_htfmin"] = value
-            overrides["m_dot_htfmax"] = value
-            del overrides["m_dot"]
-            break
-
-    # loads model with default values
-    model = TP.default(CONFIG["model"])
-
-    # initial assignment of all variables from JSON
-    for k, v in data.items():
-        if k != "number_inputs":
-            try:
-                model.value(k, v)
-            except Exception:
-                pass
-
-    # tp = TP.default(CONFIG["model"])
-    # logger.info(f"{CONFIG['model']} model loaded!")
-
-    # logger.info(f"{CONFIG['json_file']} file loaded!")
-
-    # assign(dict) -> None : takes dict and copies the values into the PySAM model
-    # export() -> dict : pulls every single parameter currently set in that
-    # PySAM module and puts them into a standard Python dictionary
-    # replace(dict) -> None : If your dictionary only has 5 variables,
-    # PySAM will "unassign" or clear all other variables in that module that are not in your dictionary.
-    # NOTE : can't use assign here, because we are assigning
-    # variables of different sub-modules
-
-    # logger.info("Variables assigned from json file to model!")
-
-    # Apply overrides (changed parameters)
-    if overrides:
-        for k, v in overrides.items():
-            # print(f'Value before : {tp.value(k)}')
-            # Fetch current value once (Best practice for performance)
-            current_val = model.value(k)
-
-            # Case: Scalar (int, float, or boolean)
-            if isinstance(current_val, (int, float, bool)):
-                model.value(k, v)
-
-            #  Case: 1st Order Sequence (List or Tuple)
-            elif isinstance(current_val, (list, tuple)):
-                if len(current_val) > 0:
-                    # Use your 1st order function to swap the first element
-                    v_new = replace_1st_order(data=current_val, new_val=v)
-                    model.value(k, v_new)
-                else:
-                    # If the list is empty, we initialize it with the new value
-                    model.value(k, [v] if isinstance(current_val, list) else (v,))
-
-            # 4. Optional: Log or skip if it's an unexpected type (like a string)
-            else:
-                print(f"Skipping key {k}: Unknown type {type(current_val)}")
-            # print(f'Value after : {tp.value(k)}')
-    # logger.info("Custom overrides of variables performed!")
-    # logger.info("Simulation started...")
-    model.execute()
-    # logger.info("Simulation finished!")
-
-    sim_result = {
-        "hourly_energy": model.Outputs.P_cycle,  # FIXME: I think here I should take PC electrical power output : P_cycle as P_out_net is net, not gross
-        "pc_htf_pump_power": model.Outputs.cycle_htf_pump_power,
-        "field_htf_pump_power": model.Outputs.W_dot_field_pump,
-        "field_collector_tracking_power": model.Outputs.W_dot_sca_track,
-        "pc_startup_thermal_power": model.Outputs.q_dot_pc_startup,
-        "field_piping_thermal_loss": model.Outputs.q_dot_piping_loss,
-        "receiver_thermal_loss": model.Outputs.q_dot_rec_thermal_loss,
-        # "field_collector_row_shadowing_loss": tp.Outputs.RowShadow_ave,
-        # "parasitic_power_generation_dependent_load": tp.Outputs.P_plant_balance_tot,
-        # "parasitic_power_fixed_load": tp.Outputs.P_fixed,
-        # "parasitic_power_condenser_operation": tp.Outputs.P_cooling_tower_tot,
-        # NOTE: I am not taking Field collector optical end loss:EndLoss_ave for now!
-        "annual_energy": model.Outputs.annual_energy,
-        "gross_annual_energy": model.Outputs.annual_W_cycle_gross,
-        "land_area": model.Outputs.total_land_area,
-        "land_cost": model.Outputs.csp_dtr_cost_plm_total,
-        "total_installed_cost": model.Outputs.total_installed_cost,
-    }
-
-    # logger.info("Outputs written to sim_result dict!")
-    return sim_result  # dict of outputs
+        return None, True

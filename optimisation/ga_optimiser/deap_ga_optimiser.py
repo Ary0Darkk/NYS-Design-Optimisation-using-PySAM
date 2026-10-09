@@ -1,3 +1,5 @@
+import os
+import re
 import random
 import json
 import hashlib
@@ -20,21 +22,94 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
 from deap import base, creator, tools, algorithms
-from mpi4py import MPI
 
 from config import CONFIG
-from ...simulation.simulation import run_simulation
-from ...objective_functions.objective_func import objective_function
-from ...utilities.index_creation import get_season_days
-
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+from simulation.simulation import run_simulation
+from objective_functions.objective_func import objective_function
+from utilities.index_creation import get_season_days
 
 logger = logging.getLogger("NYS_Optimisation")
 
 
-def worker_loop(season):
+def log_generation_metrics(
+    population,
+    hof,
+    record,
+    nevals,
+    gen,
+    design_var,
+    operational_var,
+    season_days,
+):
+    """Log generation statistics and every gene of the generation/global best."""
+
+    generation_best = tools.selBest(population, k=1)[0]
+    global_best = hof[0]
+
+    metrics = {
+        "fitness/avg": float(record["avg"]),
+        "fitness/std": float(record["std"]),
+        "fitness/min": float(record["min"]),
+        "fitness/max": float(record["max"]),
+        "fitness/nevals": float(nevals),
+        "fitness/generation_best": float(generation_best.fitness.values[0]),
+        "fitness/global_best": float(global_best.fitness.values[0]),
+        # Preserve the existing metric name for continuity.
+        "best_fitness": float(global_best.fitness.values[0]),
+    }
+
+    def safe_name(name):
+        return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name)).strip("_")
+
+    # Log each design gene individually.
+    for i, name in enumerate(design_var):
+        key = safe_name(name)
+
+        metrics[f"generation_best/design/{key}"] = float(generation_best[i])
+        metrics[f"global_best/design/{key}"] = float(global_best[i])
+
+    # Log all operational genes for every representative day.
+    num_operational_vars = len(operational_var)
+
+    for day_info in season_days:
+        local_index = day_info["local_index"]
+
+        day_label = (
+            f"day_{local_index + 1:02d}_{day_info['month']:02d}_{day_info['day']:02d}"
+        )
+
+        for j, name in enumerate(operational_var):
+            gene_index = len(design_var) + local_index * num_operational_vars + j
+
+            key = safe_name(name)
+
+            metrics[f"generation_best/operational/{day_label}/{key}"] = float(
+                generation_best[gene_index]
+            )
+
+            metrics[f"global_best/operational/{day_label}/{key}"] = float(
+                global_best[gene_index]
+            )
+
+    # Avoid sending NaN or infinite values to MLflow.
+    metrics = {key: value for key, value in metrics.items() if np.isfinite(value)}
+
+    # Every metric is associated with this generation.
+    mlflow.log_metrics(metrics, step=gen)
+
+    logger.info(
+        "Generation %d | best fitness: %.6f | global best fitness: %.6f",
+        gen,
+        generation_best.fitness.values[0],
+        global_best.fitness.values[0],
+    )
+
+
+def worker_loop(
+    season,
+    comm,
+    rank,
+):
     """
     Worker MPI rank.
 
@@ -44,7 +119,10 @@ def worker_loop(season):
 
     print(f"[Rank {rank}] Starting worker for season: {season}")
 
-    pool = mp.Pool(processes=112)
+    # pool = mp.Pool(processes=112)
+    num_workers = int(os.environ.get("LOCAL_WORKERS", "4"))
+
+    pool = mp.Pool(processes=num_workers)
 
     try:
         while True:
@@ -53,7 +131,6 @@ def worker_loop(season):
                 tag=1,
             )
 
-            # None means shutdown
             if batch is None:
                 break
 
@@ -87,7 +164,7 @@ def batch_individuals(individuals, batch_size=16):
     ]
 
 
-def evaluate_batch(batch, pool, season):
+def evaluate_batch(batch, pool, season, rank):
     """
     Evaluate a batch of individuals over all representative
     days belonging to the selected season.
@@ -141,32 +218,27 @@ def distribute_batches(
     batches,
     local_pool,
     season,
+    comm,
+    rank,
+    mpi_size,
 ):
-    """
-    Distribute batches across MPI worker ranks.
-
-    Rank 0 evaluates one batch locally while remote MPI
-    ranks evaluate their assigned batches.
-    """
-
-    workers = list(range(1, size))
+    workers = list(range(1, mpi_size))
 
     all_fitnesses = []
 
     for wave_start in range(
         0,
         len(batches),
-        size,
+        mpi_size,
     ):
-        wave = batches[wave_start : wave_start + size]
+        wave = batches[wave_start : wave_start + mpi_size]
 
         logger.info(
-            f"[Rank 0] Processing batches {wave_start + 1} - {wave_start + len(wave)}"
+            f"[Rank {rank}] "
+            f"Processing batches "
+            f"{wave_start + 1} - "
+            f"{wave_start + len(wave)}"
         )
-
-        # -------------------------------------------------
-        # Send batches to remote MPI ranks
-        # -------------------------------------------------
 
         remote_batches = wave[: len(workers)]
 
@@ -180,26 +252,16 @@ def distribute_batches(
                 tag=1,
             )
 
-        # -------------------------------------------------
-        # Rank 0 evaluates local batch
-        # -------------------------------------------------
-
         local_result = None
 
         if len(wave) > len(workers):
             local_batch = wave[len(workers)]
-
-            logger.info("[Rank 0] Evaluating local batch")
 
             local_result = evaluate_batch(
                 batch=local_batch,
                 pool=local_pool,
                 season=season,
             )
-
-        # -------------------------------------------------
-        # Receive remote results
-        # -------------------------------------------------
 
         remote_results = []
 
@@ -210,10 +272,6 @@ def distribute_batches(
             )
 
             remote_results.extend(result)
-
-        # -------------------------------------------------
-        # Preserve batch order
-        # -------------------------------------------------
 
         all_fitnesses.extend(remote_results)
 
@@ -227,11 +285,10 @@ def evaluate_population(
     population,
     local_pool,
     season,
+    comm,
+    rank,
+    mpi_size,
 ):
-    """
-    Evaluate an entire DEAP population.
-    """
-
     batches = batch_individuals(
         population,
         batch_size=16,
@@ -241,6 +298,9 @@ def evaluate_population(
         batches=batches,
         local_pool=local_pool,
         season=season,
+        comm=comm,
+        rank=rank,
+        mpi_size=mpi_size,
     )
 
     for individual, fitness in zip(
@@ -390,6 +450,9 @@ def deserialize_population(serialized, toolbox):
 def run_deap_ga_optimisation(
     season: str,
     local_pool,
+    comm,
+    rank,
+    mpi_size,
 ):
     if season not in CONFIG["SEASONS"]:
         raise ValueError(
@@ -605,6 +668,9 @@ def run_deap_ga_optimisation(
             population=pop,
             local_pool=local_pool,
             season=season,
+            comm=comm,
+            rank=rank,
+            mpi_size=mpi_size,
         )
         hof.update(pop)
 
@@ -621,6 +687,9 @@ def run_deap_ga_optimisation(
             population=offspring,
             local_pool=local_pool,
             season=season,
+            comm=comm,
+            rank=rank,
+            mpi_size=mpi_size,
         )
 
         pop = toolbox.select(offspring, k=pop_size)
@@ -628,6 +697,17 @@ def run_deap_ga_optimisation(
 
         record = stats.compile(pop)
         logbook.record(gen=gen, nevals=nevals, **record)
+
+        log_generation_metrics(
+            population=pop,
+            hof=hof,
+            record=record,
+            nevals=nevals,
+            gen=gen,
+            design_var=design_var,
+            operational_var=operational_var,
+            season_days=season_days,
+        )
 
         gens_log.append(gen)
         max_fitness_log.append(record["max"])
@@ -649,29 +729,7 @@ def run_deap_ga_optimisation(
             fig.savefig(plot_path, dpi=120, bbox_inches="tight")
             plt.close(fig)
 
-        mlflow.log_metrics(
-            {
-                "fitness_avg": float(record["avg"]),
-                "fitness_std": float(record["std"]),
-                "fitness_min": float(record["min"]),
-                "fitness_max": float(record["max"]),
-                "nevals": float(nevals),
-            },
-            step=gen,
-        )
         best_ind = hof[0]
-
-        mlflow.log_metrics(
-            {
-                "best_fitness": float(best_ind.fitness.values[0]),
-                "best_aperture": float(best_ind[0]),
-                "best_row_distance": float(best_ind[1]),
-                "best_col_per_sca": float(best_ind[2]),
-                "best_w_aperture": float(best_ind[3]),
-                "best_l_sca": float(best_ind[4]),
-            },
-            step=gen,
-        )
 
         cp_data = {
             "var_name": design_var + operational_var,
@@ -688,38 +746,47 @@ def run_deap_ga_optimisation(
         }
 
         try:
-            # saves "latest" checkpoint
-            safe_pickle_save(cp_data, resume_file)
+            # Save the latest and generation-specific checkpoints.
+            latest_saved = safe_pickle_save(
+                cp_data,
+                resume_file,
+            )
 
-            # Periodic history checkpoint
-            if gen % CONFIG.get("checkpoint_interval") == 0:
-                gen_file = Path(f"{checkpoint_dir}/checkpoint_gen_{gen}.pkl")
-                gen_file.parent.mkdir(parents=True, exist_ok=True)
-                safe_pickle_save(cp_data, gen_file)
-                mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
+            gen_file = checkpoint_dir / f"checkpoint_gen_{gen}.pkl"
+
+            generation_saved = safe_pickle_save(
+                cp_data,
+                gen_file,
+            )
+
+            if not latest_saved or not generation_saved:
+                logger.error(
+                    "Checkpoint save incomplete at generation %d "
+                    "(latest=%s, generation=%s)",
+                    gen,
+                    latest_saved,
+                    generation_saved,
+                )
+            else:
+                logger.info(
+                    "Saved checkpoints for generation %d",
+                    gen,
+                )
+
+                # Upload every generation's checkpoint to MLflow.
+                try:
+                    mlflow.log_artifact(
+                        str(gen_file),
+                        artifact_path="checkpoints/history",
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to upload generation %d checkpoint "
+                        "to MLflow; local checkpoint is preserved.",
+                        gen,
+                    )
         except Exception as e:
             logger.warning(f"Checkpoint write failed (Generation {gen}): {e}")
-
-        # def save_to_json(cp_data,file_name):
-        #     with open(file_name, "w") as f:
-        #         json.dump(cp_data, f, indent=4)
-
-        # # Save the "latest" checkpoint directly
-        # save_to_json(cp_data, resume_file)
-
-        # # Periodic history checkpoint
-        # if gen % CONFIG.get("checkpoint_interval", 5) == 0:
-        #     gen_file = Path(f"{checkpoint_dir}/ checkpoint_gen_{gen}.json")
-        #     gen_file.parent.mkdir(parents=True, exist_ok=True)
-        #     save_to_json(cp_data, gen_file)
-
-        #     # Ensure file is written before logging to MLflow
-        #     if gen_file.exists():
-        #         mlflow.log_artifact(str(gen_file), artifact_path="checkpoints/history")
-
-    # save as a static image at the end
-    # fig.savefig(fname=file_name)
-    # plt.show() # blocks execution of code
 
     # =========================================================
     # FINAL RESULT

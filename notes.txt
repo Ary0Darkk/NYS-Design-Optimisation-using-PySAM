@@ -199,3 +199,11 @@ Now question is how can I bring them beautifully over MLflow.
 4 jobs --> each of 7 nodes --> each node has 112 cores --> 16 individuals can be handled at once --> as we have 7 nodes therefore all can be handled at once --> 3min/simulation --> 3min * 100 = 300/60 = 5 hrs for one season
 each season has 7 representative days
 therefore -> require 7 processes
+
+2026-10-9
+LOCAL_WORKERS=4 mpirun -np 4 uv run python main.py --season winter
+
+export LOCAL_WORKERS=112
+mpirun -np 7 uv run python main.py --season "$SEASON"
+
+So In case of HPC, we just make it 112
