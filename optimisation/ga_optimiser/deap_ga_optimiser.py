@@ -140,6 +140,7 @@ def worker_loop(
                 batch=batch,
                 pool=pool,
                 season=season,
+                rank=rank,
             )
 
             comm.send(
@@ -261,6 +262,7 @@ def distribute_batches(
                 batch=local_batch,
                 pool=local_pool,
                 season=season,
+                rank=rank,
             )
 
         remote_results = []
