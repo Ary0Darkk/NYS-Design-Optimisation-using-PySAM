@@ -40,6 +40,10 @@ def log_generation_metrics(
     design_var,
     operational_var,
     season_days,
+    simulation_successful,
+    simulation_penalized,
+    run_successful_total,
+    run_penalized_total,
 ):
     """Log generation statistics and every gene of the generation/global best."""
 
@@ -57,6 +61,24 @@ def log_generation_metrics(
         # Preserve the existing metric name for continuity.
         "best_fitness": float(global_best.fitness.values[0]),
     }
+    simulation_total = simulation_successful + simulation_penalized
+
+    simulation_success_rate = (
+        100.0 * simulation_successful / simulation_total
+        if simulation_total > 0
+        else 0.0
+    )
+
+    metrics.update(
+        {
+            "simulations/successful": float(simulation_successful),
+            "simulations/penalized": float(simulation_penalized),
+            "simulations/total": float(simulation_total),
+            "simulations/success_rate_pct": float(simulation_success_rate),
+            "simulations/run_successful_total": float(run_successful_total),
+            "simulations/run_penalized_total": float(run_penalized_total),
+        }
+    )
 
     def safe_name(name):
         return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name)).strip("_")
@@ -136,7 +158,7 @@ def worker_loop(
 
             print(f"[Rank {rank}] Received batch of {len(batch)} individuals")
 
-            fitnesses = evaluate_batch(
+            batch_result = evaluate_batch(
                 batch=batch,
                 pool=pool,
                 season=season,
@@ -144,7 +166,7 @@ def worker_loop(
             )
 
             comm.send(
-                fitnesses,
+                batch_result,
                 dest=0,
                 tag=2,
             )
@@ -167,12 +189,15 @@ def batch_individuals(individuals, batch_size=16):
 
 def evaluate_batch(batch, pool, season, rank):
     """
-    Evaluate a batch of individuals over all representative
-    days belonging to the selected season.
+    Evaluate a batch of individuals across all representative days.
+
+    Returns:
+        fitnesses: DEAP-compatible fitness tuples
+        successful: number of successful simulations
+        penalized: number of penalized simulations
     """
 
     season_days = get_season_days(season)
-
     tasks = []
 
     for individual_id, individual in enumerate(batch):
@@ -189,18 +214,17 @@ def evaluate_batch(batch, pool, season, rank):
             )
 
     logger.info(
-        f"[Rank {rank}] "
-        f"Created {len(tasks)} simulation tasks "
+        f"[Rank {rank}] Created {len(tasks)} simulation tasks "
         f"for {len(batch)} individuals"
     )
 
-    results = pool.starmap(
-        run_one_simulation,
-        tasks,
-    )
+    results = pool.starmap(run_one_simulation, tasks)
 
-    # One total fitness per individual
+    # One fitness total per individual in this batch
     fitnesses = [0.0] * len(batch)
+
+    successful = 0
+    penalized = 0
 
     for (
         individual_id,
@@ -209,10 +233,26 @@ def evaluate_batch(batch, pool, season, rank):
         day,
         day_index,
         objective,
+        was_penalized,
     ) in results:
         fitnesses[individual_id] += objective
 
-    return [(fitness,) for fitness in fitnesses]
+        if was_penalized:
+            penalized += 1
+        else:
+            successful += 1
+
+    logger.info(
+        f"[Rank {rank}] Batch completed | "
+        f"successful={successful} | penalized={penalized} | "
+        f"total={successful + penalized}"
+    )
+
+    return {
+        "fitnesses": [(fitness,) for fitness in fitnesses],
+        "successful": successful,
+        "penalized": penalized,
+    }
 
 
 def distribute_batches(
@@ -226,32 +266,21 @@ def distribute_batches(
     workers = list(range(1, mpi_size))
 
     all_fitnesses = []
+    total_successful = 0
+    total_penalized = 0
 
-    for wave_start in range(
-        0,
-        len(batches),
-        mpi_size,
-    ):
+    for wave_start in range(0, len(batches), mpi_size):
         wave = batches[wave_start : wave_start + mpi_size]
 
         logger.info(
-            f"[Rank {rank}] "
-            f"Processing batches "
-            f"{wave_start + 1} - "
-            f"{wave_start + len(wave)}"
+            f"[Rank {rank}] Processing batches "
+            f"{wave_start + 1} - {wave_start + len(wave)}"
         )
 
         remote_batches = wave[: len(workers)]
 
-        for worker, batch in zip(
-            workers,
-            remote_batches,
-        ):
-            comm.send(
-                batch,
-                dest=worker,
-                tag=1,
-            )
+        for worker, batch in zip(workers, remote_batches):
+            comm.send(batch, dest=worker, tag=1)
 
         local_result = None
 
@@ -265,22 +294,30 @@ def distribute_batches(
                 rank=rank,
             )
 
+        # Receive the remote results in the same order
+        # that the corresponding batches were dispatched.
         remote_results = []
 
         for worker in workers[: len(remote_batches)]:
-            result = comm.recv(
-                source=worker,
-                tag=2,
-            )
+            result = comm.recv(source=worker, tag=2)
+            remote_results.append(result)
 
-            remote_results.extend(result)
-
-        all_fitnesses.extend(remote_results)
+        # Append fitnesses and counts in batch order.
+        for result in remote_results:
+            all_fitnesses.extend(result["fitnesses"])
+            total_successful += result["successful"]
+            total_penalized += result["penalized"]
 
         if local_result is not None:
-            all_fitnesses.extend(local_result)
+            all_fitnesses.extend(local_result["fitnesses"])
+            total_successful += local_result["successful"]
+            total_penalized += local_result["penalized"]
 
-    return all_fitnesses
+    return {
+        "fitnesses": all_fitnesses,
+        "successful": total_successful,
+        "penalized": total_penalized,
+    }
 
 
 def evaluate_population(
@@ -296,7 +333,7 @@ def evaluate_population(
         batch_size=16,
     )
 
-    fitnesses = distribute_batches(
+    evaluation_result = distribute_batches(
         batches=batches,
         local_pool=local_pool,
         season=season,
@@ -305,13 +342,21 @@ def evaluate_population(
         mpi_size=mpi_size,
     )
 
-    for individual, fitness in zip(
-        population,
-        fitnesses,
-    ):
+    fitnesses = evaluation_result["fitnesses"]
+
+    if len(fitnesses) != len(population):
+        raise RuntimeError(
+            f"Expected {len(population)} fitness results, received {len(fitnesses)}"
+        )
+
+    for individual, fitness in zip(population, fitnesses):
         individual.fitness.values = fitness
 
-    return len(population)
+    return {
+        "nevals": len(population),
+        "successful": evaluation_result["successful"],
+        "penalized": evaluation_result["penalized"],
+    }
 
 
 def run_one_simulation(
@@ -372,14 +417,15 @@ def run_one_simulation(
     # Penalty
     # -------------------------------------------------
 
-    if penalty_flag:
+    if penalty_flag or sim_result is None:
         return (
             individual_id,
             local_day_index,
             month,
             day,
             day_index,
-            CONFIG["penalty"],
+            float(CONFIG["penalty"]),
+            True,  # penalized
         )
 
     # -------------------------------------------------
@@ -401,8 +447,12 @@ def run_one_simulation(
     # Validate objective
     # -------------------------------------------------
 
-    if objective is None or not np.isfinite(objective):
-        objective = CONFIG["penalty"]
+    # Validate objective
+
+    penalized = objective is None or not np.isfinite(objective)
+
+    if penalized:
+        objective = float(CONFIG["penalty"])
 
     return (
         individual_id,
@@ -411,6 +461,7 @@ def run_one_simulation(
         day,
         day_index,
         float(objective),
+        penalized,
     )
 
 
@@ -626,36 +677,56 @@ def run_deap_ga_optimisation(
     resume_file.parent.mkdir(parents=True, exist_ok=True)
 
     # ------- Resume or fresh start -----------------------
+    run_successful_total = 0
+    run_penalized_total = 0
+
     if resume_file.exists() and CONFIG.get("resume_from_checkpoint", False):
         try:
             with open(resume_file, "rb") as f:
                 cp = pickle.load(f)
 
-            # VALIDATION: Ensure checkpoint matches current config
+            # Validate that the checkpoint matches the current configuration.
             if cp.get("ckpt_key") != ckpt_key:
                 logger.warning(
-                    "Checkpoint key mismatch! Starting fresh to avoid DNA corruption."
+                    "Checkpoint key mismatch! Starting fresh to avoid Gene corruption."
                 )
+                run_successful_total = 0
+                run_penalized_total = 0
                 pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
             else:
+                # Restore cumulative simulation counters.
+                run_successful_total = cp.get("run_successful_total", 0)
+                run_penalized_total = cp.get("run_penalized_total", 0)
+
                 logger.info(
                     f"Resuming from {resume_file} at generation {cp['generation']}"
                 )
-                # init random seed first
+
+                # Restore random states before continuing evolution.
                 random.setstate(cp["rndstate"])
                 np.random.set_state(cp["np_rndstate"])
-                pop = deserialize_population(cp["population"], toolbox)
+
+                # IMPORTANT: use the same key as the checkpoint writer.
+                pop = deserialize_population(cp["pop"], toolbox)
+
                 logbook = cp["logbook"]
+
                 hof = tools.HallOfFame(maxsize=CONFIG.get("hall_of_fame_size"))
                 hof[:] = deserialize_population(cp["hof"], toolbox)
+
                 start_gen = cp["generation"] + 1
+
         except Exception as e:
             logger.error(f"Checkpoint corrupted: {e}. Starting fresh.")
+
+            run_successful_total = 0
+            run_penalized_total = 0
+
             pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
+
     else:
-        pop, logbook, hof, start_gen = init_fresh_ga(
-            toolbox, pop_size
-        )  # Standard Start
+        # This else belongs to the try/except, not the resume condition.
+        pass
 
     stats = tools.Statistics(
         lambda ind: ind.fitness.values[0]
@@ -666,7 +737,7 @@ def run_deap_ga_optimisation(
     stats.register("max", np.max)
 
     if start_gen == 0:
-        evaluate_population(
+        initial_stats = evaluate_population(
             population=pop,
             local_pool=local_pool,
             season=season,
@@ -674,6 +745,21 @@ def run_deap_ga_optimisation(
             rank=rank,
             mpi_size=mpi_size,
         )
+
+        run_successful_total += initial_stats["successful"]
+        run_penalized_total += initial_stats["penalized"]
+
+        initial_total = initial_stats["successful"] + initial_stats["penalized"]
+
+        mlflow.log_metrics(
+            {
+                "simulations/initial_successful": initial_stats["successful"],
+                "simulations/initial_penalized": initial_stats["penalized"],
+                "simulations/initial_total": initial_total,
+            },
+            step=0,
+        )
+
         hof.update(pop)
 
     gens_log = []
@@ -685,7 +771,7 @@ def run_deap_ga_optimisation(
     # ----------- GA loop ------------------------------------
     for gen in range(start_gen, num_generations):
         offspring = algorithms.varAnd(pop, toolbox, cxpb, mutpb)
-        nevals = evaluate_population(
+        evaluation_stats = evaluate_population(
             population=offspring,
             local_pool=local_pool,
             season=season,
@@ -693,6 +779,11 @@ def run_deap_ga_optimisation(
             rank=rank,
             mpi_size=mpi_size,
         )
+
+        nevals = evaluation_stats["nevals"]
+
+        run_successful_total += evaluation_stats["successful"]
+        run_penalized_total += evaluation_stats["penalized"]
 
         pop = toolbox.select(offspring, k=pop_size)
         hof.update(pop)
@@ -709,6 +800,10 @@ def run_deap_ga_optimisation(
             design_var=design_var,
             operational_var=operational_var,
             season_days=season_days,
+            simulation_successful=evaluation_stats["successful"],
+            simulation_penalized=evaluation_stats["penalized"],
+            run_successful_total=run_successful_total,
+            run_penalized_total=run_penalized_total,
         )
 
         gens_log.append(gen)
@@ -745,6 +840,8 @@ def run_deap_ga_optimisation(
             "generation": gen,
             "rndstate": random.getstate(),
             "np_rndstate": np.random.get_state(),
+            "run_successful_total": run_successful_total,
+            "run_penalized_total": run_penalized_total,
         }
 
         try:
