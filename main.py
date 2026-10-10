@@ -71,9 +71,6 @@ def log_experiment_parameters(season, mpi_size):
 
 
 def main():
-    logger = setup_custom_logger()
-    logger.info("NYS-Optimisation started!")
-
     args = parse_args()
     season = args.season
 
@@ -84,6 +81,13 @@ def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+
+    # ---------------------------------------------------------
+    # Race-safe Logger
+    # ---------------------------------------------------------
+
+    logger = setup_custom_logger(rank=rank)
+    logger.info("NYS-Optimisation started!")
 
     logger.info(f"[Rank {rank}] Starting optimisation for season: {season}")
 
@@ -141,6 +145,7 @@ def main():
                     comm=comm,
                     rank=rank,
                     mpi_size=size,
+                    logger=logger,
                 )
 
             finally:

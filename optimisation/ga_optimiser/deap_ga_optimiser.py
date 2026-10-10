@@ -3,7 +3,6 @@ import re
 import random
 import json
 import hashlib
-import logging
 import pickle
 import multiprocessing as mp
 from datetime import datetime
@@ -28,8 +27,6 @@ from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
 from utilities.index_creation import get_season_days
 
-logger = logging.getLogger("NYS_Optimisation")
-
 
 def log_generation_metrics(
     population,
@@ -44,6 +41,7 @@ def log_generation_metrics(
     simulation_penalized,
     run_successful_total,
     run_penalized_total,
+    logger,
 ):
     """Log generation statistics and every gene of the generation/global best."""
 
@@ -127,55 +125,71 @@ def log_generation_metrics(
     )
 
 
-def worker_loop(
-    season,
-    comm,
-    rank,
-):
+def worker_loop(season, comm, rank, logger):
     """
     Worker MPI rank.
 
-    Each worker rank owns one compute node and creates
-    a local multiprocessing pool.
+    Each worker rank creates a local multiprocessing pool,
+    evaluates batches, and reports success or failure to rank 0.
     """
 
-    print(f"[Rank {rank}] Starting worker for season: {season}")
+    logger.info(
+        "Starting worker | Season: %s | MPI rank: %s",
+        season,
+        rank,
+    )
 
-    # pool = mp.Pool(processes=112)
     num_workers = int(os.environ.get("LOCAL_WORKERS", "4"))
-
     pool = mp.Pool(processes=num_workers)
 
     try:
         while True:
-            batch = comm.recv(
-                source=0,
-                tag=1,
-            )
+            batch = comm.recv(source=0, tag=1)
 
             if batch is None:
+                logger.info("Received shutdown signal")
                 break
 
-            print(f"[Rank {rank}] Received batch of {len(batch)} individuals")
-
-            batch_result = evaluate_batch(
-                batch=batch,
-                pool=pool,
-                season=season,
-                rank=rank,
+            logger.info(
+                "Received batch containing %d individuals",
+                len(batch),
             )
 
-            comm.send(
-                batch_result,
-                dest=0,
-                tag=2,
-            )
+            try:
+                batch_result = evaluate_batch(
+                    batch=batch,
+                    pool=pool,
+                    season=season,
+                    rank=rank,
+                    logger=logger,
+                )
+
+                response = {
+                    "ok": True,
+                    "result": batch_result,
+                    "error": None,
+                }
+
+            except Exception as exc:
+                logger.exception(
+                    "Batch evaluation failed on rank %s",
+                    rank,
+                )
+
+                response = {
+                    "ok": False,
+                    "result": None,
+                    "error": repr(exc),
+                }
+
+            # Always reply to rank 0 for a received batch,
+            # including when evaluation raises a Python exception.
+            comm.send(response, dest=0, tag=2)
 
     finally:
         pool.close()
         pool.join()
-
-        print(f"[Rank {rank}] Worker stopped")
+        logger.info("Worker stopped")
 
 
 def batch_individuals(individuals, batch_size=16):
@@ -187,7 +201,7 @@ def batch_individuals(individuals, batch_size=16):
     ]
 
 
-def evaluate_batch(batch, pool, season, rank):
+def evaluate_batch(batch, pool, season, rank, logger):
     """
     Evaluate a batch of individuals across all representative days.
 
@@ -262,6 +276,7 @@ def distribute_batches(
     comm,
     rank,
     mpi_size,
+    logger,
 ):
     workers = list(range(1, mpi_size))
 
@@ -327,6 +342,7 @@ def evaluate_population(
     comm,
     rank,
     mpi_size,
+    logger,
 ):
     batches = batch_individuals(
         population,
@@ -340,6 +356,7 @@ def evaluate_population(
         comm=comm,
         rank=rank,
         mpi_size=mpi_size,
+        logger=logger,
     )
 
     fitnesses = evaluation_result["fitnesses"]
@@ -465,7 +482,7 @@ def run_one_simulation(
     )
 
 
-def init_fresh_ga(toolbox, pop_size):
+def init_fresh_ga(toolbox, pop_size, logger):
     """Encapsulates the logic for starting a brand-new evolution."""
     logger.info("Starting fresh GA run")
 
@@ -506,6 +523,7 @@ def run_deap_ga_optimisation(
     comm,
     rank,
     mpi_size,
+    logger,
 ):
     if season not in CONFIG["SEASONS"]:
         raise ValueError(
@@ -744,6 +762,7 @@ def run_deap_ga_optimisation(
             comm=comm,
             rank=rank,
             mpi_size=mpi_size,
+            logger=logger,
         )
 
         run_successful_total += initial_stats["successful"]
@@ -778,6 +797,7 @@ def run_deap_ga_optimisation(
             comm=comm,
             rank=rank,
             mpi_size=mpi_size,
+            logger=logger,
         )
 
         nevals = evaluation_stats["nevals"]
@@ -804,6 +824,7 @@ def run_deap_ga_optimisation(
             simulation_penalized=evaluation_stats["penalized"],
             run_successful_total=run_successful_total,
             run_penalized_total=run_penalized_total,
+            logger=logger,
         )
 
         gens_log.append(gen)
