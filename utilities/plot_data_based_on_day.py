@@ -52,11 +52,10 @@ def plot_dni_consecutive(selections):
     # This keeps every 6th label (e.g., 00:00, 06:00, 12:00, 18:00)
     ax = plt.gca()
     n = 24
-    [
-        l.set_visible(False)
-        for (i, l) in enumerate(ax.xaxis.get_ticklabels())
-        if i % n != 0
-    ]
+
+    for index, label in enumerate(ax.xaxis.get_ticklabels()):
+        if index % n != 0:
+            label.set_visible(False)
 
     plt.title("Weather data: specific month & day", fontsize=14)
     plt.ylabel("Clearsky DNI (W/m²)")
@@ -72,11 +71,9 @@ def plot_dni_consecutive(selections):
 
 if __name__ == "__main__":
     # Example Usage:
-    # my_dates = CONFIG["USER_DEFINED_DAYS"]["summer"]
+    # my_dates = CONFIG["SEASONS"]["summer"]
     my_dates = [
-        day
-        for season_days in CONFIG["USER_DEFINED_DAYS"].values()
-        for day in season_days
+        day for season_days in CONFIG["SEASONS"].values() for day in season_days
     ]
     # print(my_dates)
     plot_dni_consecutive(my_dates)

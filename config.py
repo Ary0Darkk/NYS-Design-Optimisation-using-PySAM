@@ -6,13 +6,8 @@ Modify values here only — all scripts will automatically use them.
 
 # NOTE: Need to find variable name for "Number of SCA per loop", this variable is found on outputs section in pysam
 import os
-from datetime import datetime
 
 CONFIG = {
-    # author name -> whenever run it write your name
-    "author": "Aryan",
-    "run_name": None,
-    "session_time": datetime.now().strftime("%Y%m%d_%H%M%S"),
     "demand_file_path": "electricity_data/Yearly Demand Profile Haryana-Himanchal.xlsx",
     "show_demand_plot": False,
     "show_price_plot": False,
@@ -56,7 +51,6 @@ CONFIG = {
         "ub": [12, 375, 350],
         "types": [int, int, int],
     },
-    # "design_optimals": None,
     # -----deap-ga optimisation settings--------------------
     "checkpoint_interval": 1,
     "random_seed": 41,
@@ -69,15 +63,15 @@ CONFIG = {
     "indpb": 0.1,  # decides how much a chosen individual changes,generally 1/num of variables
     "verbose": True,
     # ------rl-based optimisation settings-------------------
-    "rl_max_steps": 3,
-    "rl_eval_steps": 2,
-    "rl_timesteps": 10,
-    "rl_epochs": 10,
-    "rl_gamma": 0.99,
-    "rl_lr": 3e-1,
-    "rl_checkpoint_freq": 10,
-    "rl_batch_size": 10,
-    "rl_ent_coef": 0,
+    # "rl_max_steps": 3,
+    # "rl_eval_steps": 2,
+    # "rl_timesteps": 10,
+    # "rl_epochs": 10,
+    # "rl_gamma": 0.99,
+    # "rl_lr": 3e-1,
+    # "rl_checkpoint_freq": 10,
+    # "rl_batch_size": 10,
+    # "rl_ent_coef": 0,
     # ------- other optimiser (not available) ------------------------------------------------
     # nlopt-fmincon settings
     # "nlopt_algorithm": "LD_SLSQP",
