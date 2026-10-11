@@ -131,6 +131,10 @@ def worker_loop(season, comm, rank, logger):
 
     Each worker rank creates a local multiprocessing pool,
     evaluates batches, and reports success or failure to rank 0.
+
+    A Python exception during batch evaluation is reported to rank 0.
+    If evaluation fails, the worker terminates its local pool before
+    exiting instead of potentially hanging while joining it.
     """
 
     logger.info(
@@ -140,18 +144,36 @@ def worker_loop(season, comm, rank, logger):
     )
 
     num_workers = int(os.environ.get("LOCAL_WORKERS", "4"))
-    pool = mp.Pool(processes=num_workers)
+
+    if num_workers < 1:
+        raise ValueError(f"LOCAL_WORKERS must be >= 1, got {num_workers}")
+
+    pool = None
+    pool_failed = False
 
     try:
+        pool = mp.Pool(processes=num_workers)
+
+        logger.info(
+            "Multiprocessing pool started | MPI rank: %s | Workers: %s",
+            rank,
+            num_workers,
+        )
+
         while True:
+            # Wait for a batch or shutdown signal from rank 0.
             batch = comm.recv(source=0, tag=1)
 
             if batch is None:
-                logger.info("Received shutdown signal")
+                logger.info(
+                    "Received shutdown signal | MPI rank: %s",
+                    rank,
+                )
                 break
 
             logger.info(
-                "Received batch containing %d individuals",
+                "Received batch | MPI rank: %s | Individuals: %d",
+                rank,
                 len(batch),
             )
 
@@ -164,32 +186,92 @@ def worker_loop(season, comm, rank, logger):
                     logger=logger,
                 )
 
+                # Validate the result before reporting success.
+                if not isinstance(batch_result, dict):
+                    raise TypeError("evaluate_batch() must return a dictionary")
+
+                required_keys = {
+                    "fitnesses",
+                    "successful",
+                    "penalized",
+                }
+
+                missing_keys = required_keys - batch_result.keys()
+
+                if missing_keys:
+                    raise KeyError(
+                        f"evaluate_batch() result missing keys: {sorted(missing_keys)}"
+                    )
+
                 response = {
                     "ok": True,
                     "result": batch_result,
                     "error": None,
                 }
 
+                logger.info(
+                    "Batch evaluated successfully | MPI rank: %s | "
+                    "Individuals: %d | Successful simulations: %s | "
+                    "Penalized simulations: %s",
+                    rank,
+                    len(batch),
+                    batch_result["successful"],
+                    batch_result["penalized"],
+                )
+
             except Exception as exc:
+                pool_failed = True
+
                 logger.exception(
-                    "Batch evaluation failed on rank %s",
+                    "Batch evaluation failed | MPI rank: %s",
                     rank,
                 )
 
                 response = {
                     "ok": False,
                     "result": None,
-                    "error": repr(exc),
+                    "error": f"{type(exc).__name__}: {exc}",
                 }
 
-            # Always reply to rank 0 for a received batch,
-            # including when evaluation raises a Python exception.
+            # Reply to rank 0 for every batch received, including failures.
             comm.send(response, dest=0, tag=2)
 
+            # Do not keep using a potentially unhealthy pool after failure.
+            if pool_failed:
+                logger.error(
+                    "Stopping worker after batch failure | MPI rank: %s",
+                    rank,
+                )
+                break
+
+    except Exception:
+        logger.exception(
+            "Worker loop encountered an unexpected error | MPI rank: %s",
+            rank,
+        )
+        raise
+
     finally:
-        pool.close()
-        pool.join()
-        logger.info("Worker stopped")
+        if pool is not None:
+            if pool_failed:
+                logger.warning(
+                    "Terminating multiprocessing pool | MPI rank: %s",
+                    rank,
+                )
+                pool.terminate()
+            else:
+                logger.info(
+                    "Closing multiprocessing pool | MPI rank: %s",
+                    rank,
+                )
+                pool.close()
+
+            pool.join()
+
+        logger.info(
+            "Worker stopped | MPI rank: %s",
+            rank,
+        )
 
 
 def batch_individuals(individuals, batch_size=16):
@@ -307,22 +389,50 @@ def distribute_batches(
                 pool=local_pool,
                 season=season,
                 rank=rank,
+                logger=logger,
             )
 
         # Receive the remote results in the same order
         # that the corresponding batches were dispatched.
-        remote_results = []
+
+        # Receive all responses expected for this wave.
+        remote_responses = []
 
         for worker in workers[: len(remote_batches)]:
-            result = comm.recv(source=worker, tag=2)
-            remote_results.append(result)
+            response = comm.recv(source=worker, tag=2)
+            remote_responses.append((worker, response))
 
-        # Append fitnesses and counts in batch order.
-        for result in remote_results:
+        # Check for batch failures after collecting all responses.
+        failures = []
+
+        for worker, response in remote_responses:
+            if not isinstance(response, dict):
+                failures.append(
+                    (worker, f"Unexpected response type: {type(response).__name__}")
+                )
+            elif not response.get("ok", False):
+                failures.append((worker, response.get("error", "Unknown worker error")))
+            elif not isinstance(response.get("result"), dict):
+                failures.append(
+                    (worker, "Worker response is missing its result dictionary")
+                )
+
+        if failures:
+            details = "; ".join(f"rank {worker}: {error}" for worker, error in failures)
+
+            logger.error("Remote batch evaluation failed: %s", details)
+
+            raise RuntimeError(f"MPI batch evaluation failed: {details}")
+
+        # Aggregate successful results in dispatch order.
+        for worker, response in remote_responses:
+            result = response["result"]
+
             all_fitnesses.extend(result["fitnesses"])
             total_successful += result["successful"]
             total_penalized += result["penalized"]
 
+        # Rank 0's local result retains the original format.
         if local_result is not None:
             all_fitnesses.extend(local_result["fitnesses"])
             total_successful += local_result["successful"]
@@ -710,7 +820,7 @@ def run_deap_ga_optimisation(
                 )
                 run_successful_total = 0
                 run_penalized_total = 0
-                pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
+                pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size, logger)
             else:
                 # Restore cumulative simulation counters.
                 run_successful_total = cp.get("run_successful_total", 0)
@@ -740,7 +850,7 @@ def run_deap_ga_optimisation(
             run_successful_total = 0
             run_penalized_total = 0
 
-            pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size)
+            pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size, logger)
 
     else:
         # This else belongs to the try/except, not the resume condition.
