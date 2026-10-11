@@ -207,3 +207,23 @@ export LOCAL_WORKERS=112
 mpirun -np 7 uv run python main.py --season "$SEASON"
 
 So In case of HPC, we just make it 112
+
+# =========================
+# 2 nodes — all seasons
+# =========================
+qsub -v SEASON=winter job2.pbs
+qsub -v SEASON=summer job2.pbs
+qsub -v SEASON=monsoon job2.pbs
+qsub -v SEASON=post job2.pbs
+
+
+# =========================
+# 7 nodes — all seasons
+# =========================
+qsub -v SEASON=winter job7.pbs
+qsub -v SEASON=summer job7.pbs
+qsub -v SEASON=monsoon job7.pbs
+qsub -v SEASON=post job7.pbs
+
+# Twenty-eight nodes
+qsub job28.pbs
