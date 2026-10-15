@@ -13,9 +13,8 @@
 #PBS -M 23b0343@iitb.ac.in
 #PBS -m abe
 
-
 # =========================================================
-# MOVE TO PROJECT DIRECTORY
+# WORKING DIRECTORY
 # =========================================================
 
 cd "$PBS_O_WORKDIR" || exit 1
@@ -23,147 +22,97 @@ cd "$PBS_O_WORKDIR" || exit 1
 echo "================================================="
 echo "NYS PySAM Seasonal Optimisation"
 echo "================================================="
-echo "Job ID       : $PBS_JOBID"
-echo "Job Name     : $PBS_JOBNAME"
-echo "Working Dir  : $PBS_O_WORKDIR"
-echo "Nodes        : $PBS_NODEFILE"
-echo "Total CPUs   : $PBS_NCPUS"
-echo "Season       : $SEASON"
+echo "Job ID      : ${PBS_JOBID:-unknown}"
+echo "Working Dir : $PWD"
+echo "Total CPUs  : ${PBS_NCPUS:-784}"
+echo "Season      : ${SEASON:-unset}"
+echo "Start time  : $(date)"
 echo "================================================="
 
-
 # =========================================================
-# CHECK SEASON
+# VALIDATE SEASON
 # =========================================================
 
-if [ -z "$SEASON" ]; then
-    echo "ERROR: SEASON was not specified."
-    echo "Submit using:"
-    echo "    qsub -v SEASON=winter season.pbs"
-    exit 1
-fi
-
-
-case "$SEASON" in
+case "${SEASON:-}" in
     winter|summer|monsoon|post)
         ;;
     *)
-        echo "ERROR: Invalid season: $SEASON"
-        echo "Allowed: winter, summer, monsoon, post"
+        echo "ERROR: Invalid or missing SEASON."
+        echo "Submit using: qsub -v SEASON=winter season.pbs"
         exit 1
         ;;
 esac
 
+# =========================================================
+# LOAD SPACK AND OPEN MPI
+# =========================================================
+
+source /apps/spack/v0.23/share/spack/setup-env.sh || exit 1
+spack load openmpi@4.1.6 || exit 1
+
+MPI_PREFIX="$(spack location -i openmpi@4.1.6)" || exit 1
+export LD_LIBRARY_PATH="$MPI_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+echo "MPI launcher: $(command -v mpirun)"
+mpirun --version
 
 # =========================================================
-# DAgshub / MLflow AUTHENTICATION
+# PYTHON ENVIRONMENT USING UV
 # =========================================================
 
-if [ -f "$HOME/.dagshub_token" ]; then
+if [ ! -x ".venv/bin/python" ]; then
+    echo "Creating Python environment..."
+    uv venv || exit 1
+fi
 
+uv sync || exit 1
+
+# =========================================================
+# DAGSHUB / MLFLOW AUTHENTICATION
+# =========================================================
+
+if [ -r "$HOME/.dagshub_token" ]; then
     export MLFLOW_TRACKING_USERNAME="aryanvj787"
-
-    export MLFLOW_TRACKING_PASSWORD="$(
-        cat "$HOME/.dagshub_token"
-    )"
-
+    export MLFLOW_TRACKING_PASSWORD="$(cat "$HOME/.dagshub_token")"
     export MLFLOW_TRACKING_URI="https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
-
-    echo "MLflow/DagsHub authentication configured."
-
 else
-
-    echo "WARNING: $HOME/.dagshub_token not found."
-    echo "MLflow logging may fail."
-
+    echo "WARNING: DagsHub token missing or unreadable."
+    echo "Remote MLflow logging may fail."
 fi
 
-
 # =========================================================
-# PYTHON ENVIRONMENT
-# =========================================================
-
-# spack is NOT required here if your environment is
-# already configured for Python/mpi4py.
-
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
-else
-    echo "ERROR: .venv not found."
-    exit 1
-fi
-
-
-# =========================================================
-# PARALLELISM CONTROL
+# PARALLELISM SETTINGS
 # =========================================================
 
-# PBS allocates:
-#
-#   7 nodes × 112 CPUs = 784 CPUs
-#
-export APP_CPU_COUNT="$PBS_NCPUS"
-
-# Prevent NumPy / MKL / BLAS from creating additional
-# threads inside each multiprocessing worker.
+export APP_CPU_COUNT="${PBS_NCPUS:-784}"
+export LOCAL_WORKERS="${LOCAL_WORKERS:-112}"
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-
-# =========================================================
-# DISPLAY ALLOCATION
-# =========================================================
-
-echo ""
-echo "Allocated nodes:"
+echo "MPI ranks          : 7"
+echo "Local workers/rank : $LOCAL_WORKERS"
+echo "Allocated hosts:"
 sort -u "$PBS_NODEFILE"
 
-echo ""
-echo "MPI ranks:"
-echo "7"
-
-echo ""
-echo "CPUs per MPI rank:"
-echo "112"
-
-echo ""
-echo "Total CPUs:"
-echo "$APP_CPU_COUNT"
-
-echo ""
-echo "Season:"
-echo "$SEASON"
-
-echo ""
-echo "================================================="
-echo "Starting MPI optimisation..."
-echo "================================================="
-
-
 # =========================================================
-# RUN
+# RUN OPTIMISATION
 # =========================================================
+
+echo "Starting $SEASON optimisation at $(date)"
 
 mpirun -np 7 \
-    uv run python main.py \
-    --season "$SEASON"
-
+    uv run python3 main.py --season "$SEASON"
 
 EXIT_CODE=$?
 
-
-# =========================================================
-# FINISH
-# =========================================================
-
-echo ""
 echo "================================================="
 echo "Optimisation finished"
-echo "Exit code: $EXIT_CODE"
-echo "Season: $SEASON"
+echo "Season    : $SEASON"
+echo "Exit code : $EXIT_CODE"
+echo "End time  : $(date)"
 echo "================================================="
 
 exit "$EXIT_CODE"

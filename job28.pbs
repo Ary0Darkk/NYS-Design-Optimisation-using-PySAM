@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# =========================================================
+# PBS JOB CONFIGURATION
+# =========================================================
+
 #PBS -N NYS_All_Seasons
 #PBS -q large
 #PBS -l select=28:ncpus=112:mpiprocs=1
@@ -9,121 +13,143 @@
 #PBS -M 23b0343@iitb.ac.in
 #PBS -m abe
 
-set -u
+# =========================================================
+# WORKING DIRECTORY
+# =========================================================
 
 cd "$PBS_O_WORKDIR" || exit 1
 
-echo "Job ID: $PBS_JOBID"
-echo "Working directory: $PBS_O_WORKDIR"
-echo "Total CPUs: $PBS_NCPUS"
+echo "================================================="
+echo "NYS PySAM - All Seasons"
+echo "Job ID      : ${PBS_JOBID:-unknown}"
+echo "Working Dir : $PWD"
+echo "Total CPUs  : ${PBS_NCPUS:-3136}"
+echo "Start time  : $(date)"
+echo "================================================="
 
-# ---------------------------------------------------------
-# Python environment
-# ---------------------------------------------------------
+# =========================================================
+# LOG DIRECTORY
+# =========================================================
 
-if [ ! -f ".venv/bin/activate" ]; then
-    echo "ERROR: .venv not found."
-    exit 1
+LOG_DIR="$PWD/logs/${PBS_JOBID:-manual_run}"
+mkdir -p "$LOG_DIR" || exit 1
+
+# =========================================================
+# LOAD OPEN MPI
+# =========================================================
+
+source /apps/spack/v0.23/share/spack/setup-env.sh || exit 1
+spack load openmpi@4.1.6 || exit 1
+
+MPI_PREFIX="$(spack location -i openmpi@4.1.6)" || exit 1
+export LD_LIBRARY_PATH="$MPI_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+echo "MPI launcher: $(command -v mpirun)"
+mpirun --version
+
+# =========================================================
+# PREPARE PYTHON ENVIRONMENT WITH UV
+# =========================================================
+
+if [ ! -x ".venv/bin/python" ]; then
+    echo "Creating Python environment..."
+    uv venv || exit 1
 fi
 
-source .venv/bin/activate
+uv sync || exit 1
 
-# ---------------------------------------------------------
-# DagsHub / MLflow authentication
-# ---------------------------------------------------------
+# =========================================================
+# DAGSHUB / MLFLOW
+# =========================================================
 
 if [ -f "$HOME/.dagshub_token" ]; then
     export MLFLOW_TRACKING_USERNAME="aryanvj787"
     export MLFLOW_TRACKING_PASSWORD="$(cat "$HOME/.dagshub_token")"
     export MLFLOW_TRACKING_URI="https://dagshub.com/aryanvj787/NYS-Design-Optimisation-using-PySAM.mlflow"
 else
-    echo "WARNING: DagsHub token not found."
+    echo "WARNING: DagsHub token not found; remote MLflow logging may fail."
 fi
 
-# ---------------------------------------------------------
-# Parallelism settings
-# ---------------------------------------------------------
+# =========================================================
+# PARALLELISM SETTINGS
+# =========================================================
 
-export LOCAL_WORKERS=112
-export APP_CPU_COUNT="$PBS_NCPUS"
+export APP_CPU_COUNT="${PBS_NCPUS:-3136}"
+export LOCAL_WORKERS="${LOCAL_WORKERS:-112}"
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-# ---------------------------------------------------------
-# Split the 28 allocated hosts into four groups
-# ---------------------------------------------------------
+echo "Allocated CPUs         : $APP_CPU_COUNT"
+echo "MPI ranks per season   : 7"
+echo "Local workers setting  : $LOCAL_WORKERS"
 
-WORK_DIR="${TMPDIR:-/tmp}/nys_${PBS_JOBID//[^a-zA-Z0-9]/_}"
-mkdir -p "$WORK_DIR"
+# =========================================================
+# SPLIT 28 HOSTS INTO FOUR GROUPS OF SEVEN
+# =========================================================
 
-sort -u "$PBS_NODEFILE" > "$WORK_DIR/all_hosts.txt"
+sort -u "$PBS_NODEFILE" > "$LOG_DIR/all_hosts.txt"
 
-HOST_COUNT=$(wc -l < "$WORK_DIR/all_hosts.txt")
+HOST_COUNT=$(wc -l < "$LOG_DIR/all_hosts.txt")
 
 if [ "$HOST_COUNT" -ne 28 ]; then
-    echo "ERROR: Expected 28 unique hosts, found $HOST_COUNT."
-    echo "Allocated hosts:"
-    cat "$WORK_DIR/all_hosts.txt"
+    echo "ERROR: Expected 28 unique hosts; found $HOST_COUNT."
+    cat "$LOG_DIR/all_hosts.txt"
     exit 1
 fi
 
-sed -n '1,7p'   "$WORK_DIR/all_hosts.txt" > "$WORK_DIR/winter.hosts"
-sed -n '8,14p'  "$WORK_DIR/all_hosts.txt" > "$WORK_DIR/summer.hosts"
-sed -n '15,21p' "$WORK_DIR/all_hosts.txt" > "$WORK_DIR/monsoon.hosts"
-sed -n '22,28p' "$WORK_DIR/all_hosts.txt" > "$WORK_DIR/post.hosts"
+sed -n '1,7p'   "$LOG_DIR/all_hosts.txt" > "$LOG_DIR/winter.hosts"
+sed -n '8,14p'  "$LOG_DIR/all_hosts.txt" > "$LOG_DIR/summer.hosts"
+sed -n '15,21p' "$LOG_DIR/all_hosts.txt" > "$LOG_DIR/monsoon.hosts"
+sed -n '22,28p' "$LOG_DIR/all_hosts.txt" > "$LOG_DIR/post.hosts"
 
 echo "Host allocation:"
 for season in winter summer monsoon post; do
     echo "---- $season ----"
-    cat "$WORK_DIR/$season.hosts"
+    cat "$LOG_DIR/$season.hosts"
 done
 
-# ---------------------------------------------------------
-# Launch four independent MPI runs
-# ---------------------------------------------------------
+# =========================================================
+# LAUNCH FOUR SEASONS CONCURRENTLY
+# =========================================================
 
-# IMPORTANT:
-# Confirm that your cluster's MPI implementation supports
-# hostfile-restricted launches inside PBS before production use.
+echo "Starting all four seasons at $(date)"
 
-mpirun -hostfile "$WORK_DIR/winter.hosts" -np 7 \
-    uv run python main.py --season winter \
-    > "$WORK_DIR/winter.log" 2>&1 &
+mpirun -hostfile "$LOG_DIR/winter.hosts" -np 7 \
+    uv run python3 main.py --season winter \
+    > "$LOG_DIR/winter.log" 2>&1 &
 PID_WINTER=$!
 
-mpirun -hostfile "$WORK_DIR/summer.hosts" -np 7 \
-    uv run python main.py --season summer \
-    > "$WORK_DIR/summer.log" 2>&1 &
+mpirun -hostfile "$LOG_DIR/summer.hosts" -np 7 \
+    uv run python3 main.py --season summer \
+    > "$LOG_DIR/summer.log" 2>&1 &
 PID_SUMMER=$!
 
-mpirun -hostfile "$WORK_DIR/monsoon.hosts" -np 7 \
-    uv run python main.py --season monsoon \
-    > "$WORK_DIR/monsoon.log" 2>&1 &
+mpirun -hostfile "$LOG_DIR/monsoon.hosts" -np 7 \
+    uv run python3 main.py --season monsoon \
+    > "$LOG_DIR/monsoon.log" 2>&1 &
 PID_MONSOON=$!
 
-mpirun -hostfile "$WORK_DIR/post.hosts" -np 7 \
-    uv run python main.py --season post \
-    > "$WORK_DIR/post.log" 2>&1 &
+mpirun -hostfile "$LOG_DIR/post.hosts" -np 7 \
+    uv run python3 main.py --season post \
+    > "$LOG_DIR/post.log" 2>&1 &
 PID_POST=$!
 
-# ---------------------------------------------------------
-# Wait for all four runs and collect exit codes
-# ---------------------------------------------------------
+# =========================================================
+# COLLECT EXIT STATUSES
+# =========================================================
 
-wait "$PID_WINTER"
-STATUS_WINTER=$?
+STATUS_WINTER=0
+STATUS_SUMMER=0
+STATUS_MONSOON=0
+STATUS_POST=0
 
-wait "$PID_SUMMER"
-STATUS_SUMMER=$?
-
-wait "$PID_MONSOON"
-STATUS_MONSOON=$?
-
-wait "$PID_POST"
-STATUS_POST=$?
+wait "$PID_WINTER" || STATUS_WINTER=$?
+wait "$PID_SUMMER" || STATUS_SUMMER=$?
+wait "$PID_MONSOON" || STATUS_MONSOON=$?
+wait "$PID_POST" || STATUS_POST=$?
 
 echo "================================================="
 echo "Season results"
@@ -131,14 +157,17 @@ echo "winter : $STATUS_WINTER"
 echo "summer : $STATUS_SUMMER"
 echo "monsoon: $STATUS_MONSOON"
 echo "post   : $STATUS_POST"
-echo "Logs   : $WORK_DIR"
+echo "Logs   : $LOG_DIR"
+echo "End time: $(date)"
 echo "================================================="
 
 if [ "$STATUS_WINTER" -ne 0 ] ||
    [ "$STATUS_SUMMER" -ne 0 ] ||
    [ "$STATUS_MONSOON" -ne 0 ] ||
    [ "$STATUS_POST" -ne 0 ]; then
+    echo "ERROR: At least one season failed."
     exit 1
 fi
 
+echo "All four seasons completed successfully."
 exit 0

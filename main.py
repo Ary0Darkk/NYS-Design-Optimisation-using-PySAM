@@ -2,6 +2,7 @@ import os
 import argparse
 import multiprocessing as mp
 import json
+import socket
 
 import mlflow
 import dagshub
@@ -118,6 +119,14 @@ def main():
                     "parallelization": "MPI + multiprocessing",
                     "algorithm": "DEAP Genetic Algorithm",
                     "simulation": "PySAM",
+                    # PBS job metadata
+                    "pbs.job_id": os.getenv("PBS_JOBID", "local"),
+                    "pbs.job_name": os.getenv("PBS_JOBNAME", "local"),
+                    "pbs.queue": os.getenv("PBS_QUEUE", "unknown"),
+                    "pbs.allocated_cpus": os.getenv("PBS_NCPUS", "unknown"),
+                    "pbs.nodefile": os.getenv("PBS_NODEFILE", "unknown"),
+                    # Execution metadata
+                    "execution.hostname": socket.gethostname(),
                 }
             )
 
