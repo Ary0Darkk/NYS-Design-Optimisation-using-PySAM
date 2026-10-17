@@ -172,7 +172,7 @@ def main():
     # =========================================================
 
     else:
-        worker_loop(season=season, comm=comm, rank=rank)
+        worker_loop(season=season, comm=comm, rank=rank, logger=logger)
 
     logger.info("Optimisation Completed!")
 

@@ -104,7 +104,7 @@ sort -u "$PBS_NODEFILE"
 echo "Starting $SEASON optimisation at $(date)"
 
 mpirun -np 7 \
-    uv run python3 main.py --season "$SEASON"
+    uv run --no-sync python -u main.py --season "$SEASON"
 
 EXIT_CODE=$?
 

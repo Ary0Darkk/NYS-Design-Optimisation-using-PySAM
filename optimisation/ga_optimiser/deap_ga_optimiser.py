@@ -853,8 +853,7 @@ def run_deap_ga_optimisation(
             pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size, logger)
 
     else:
-        # This else belongs to the try/except, not the resume condition.
-        pass
+        pop, logbook, hof, start_gen = init_fresh_ga(toolbox, pop_size, logger)
 
     stats = tools.Statistics(
         lambda ind: ind.fitness.values[0]
