@@ -87,7 +87,22 @@ def main():
     # Race-safe Logger
     # ---------------------------------------------------------
 
+    print(
+        f"BEFORE LOGGER | rank={rank}/{size} | pid={os.getpid()}",
+        flush=True,
+    )
+
     logger = setup_custom_logger(rank=rank)
+
+    print(
+        f"AFTER LOGGER | rank={rank}/{size} | pid={os.getpid()}",
+        flush=True,
+    )
+
+    logger.info(
+        f"PROCESS CHECK | rank={rank}/{size} "
+        f"| pid={os.getpid()} | host={socket.gethostname()}"
+    )
     logger.info("NYS-Optimisation started!")
 
     logger.info(f"[Rank {rank}] Starting optimisation for season: {season}")
