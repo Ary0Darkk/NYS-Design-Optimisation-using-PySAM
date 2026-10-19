@@ -6,7 +6,7 @@
 
 #PBS -N NYS_PySAM_Optimization_2Nodes
 #PBS -q medium
-#PBS -l select=2:ncpus=112:mpiprocs=1
+#PBS -l select=2:ncpus=112:mpiprocs=112
 #PBS -l place=scatter
 #PBS -j oe
 #PBS -M 23b0343@iitb.ac.in

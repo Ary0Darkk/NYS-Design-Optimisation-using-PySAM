@@ -6,7 +6,7 @@
 
 #PBS -N NYS_All_Seasons
 #PBS -q large
-#PBS -l select=28:ncpus=112:mpiprocs=1
+#PBS -l select=28:ncpus=112:mpiprocs=112
 #PBS -l place=scatter
 #PBS -l walltime=12:00:00
 #PBS -j oe
