@@ -2,6 +2,7 @@ import os
 import re
 import random
 import json
+import math
 import hashlib
 import pickle
 import multiprocessing as mp
@@ -26,6 +27,7 @@ from config import CONFIG
 from simulation.simulation import run_simulation
 from objective_functions.objective_func import objective_function
 from utilities.index_creation import get_season_days
+from utilities.calculate_batch_size import calculate_batch_size
 
 
 def log_generation_metrics(
@@ -454,9 +456,27 @@ def evaluate_population(
     mpi_size,
     logger,
 ):
+    batch_size = calculate_batch_size(
+        population_size=len(population),
+        mpi_size=mpi_size,
+        num_days=len(get_season_days(season)),
+    )
+
+    logger.info(
+        "Dynamic batching | population=%d | MPI ranks=%d | "
+        "workers/rank=%d | representative_days=%d | batch_size=%d | "
+        "total_batches=%d",
+        len(population),
+        mpi_size,
+        int(os.environ.get("LOCAL_WORKERS", "112")),
+        len(get_season_days(season)),
+        batch_size,
+        math.ceil(len(population) / batch_size),
+    )
+
     batches = batch_individuals(
         population,
-        batch_size=16,
+        batch_size=batch_size,
     )
 
     evaluation_result = distribute_batches(

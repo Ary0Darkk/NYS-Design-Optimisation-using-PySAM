@@ -91,7 +91,7 @@ echo "================================================="
 # RUN OPTIMISATION
 # =========================================================
 
-mpirun -np 7 \
+mpirun -np 2 \
     uv run --no-sync python -u main.py --season "$SEASON"
 
 EXIT_CODE=$?
